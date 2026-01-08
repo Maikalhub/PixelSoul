@@ -52,7 +52,7 @@ Uses **free pixel art assets** allowed for commercial and non-commercial use.
 | Type    | Preview | Description |
 |---------|---------|-------------|
 | Video   | *(Add link)* | Gameplay demo |
-| Image   | *(Add image link)* | Level screenshot / UI |
+| Image   | <img width="1133" height="686" alt="111" src="https://github.com/user-attachments/assets/c0681eba-0704-4d4b-991d-15505021223c" /> | UI |
 
 ---
 
