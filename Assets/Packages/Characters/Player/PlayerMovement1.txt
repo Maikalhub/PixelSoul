@@ -1,0 +1,470 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using Unity.Cinemachine;
+
+
+
+public class PlayerMovement : MonoBehaviour
+{
+    public CinemachineImpulseSource impulseSource;
+
+    [Header("Ripple Effect")]
+    public RippleEffect rippleEffect;
+    public float rippleStrength = 1.0f; // Сила эффекта ripple при рывке
+
+    [Header("Ghost Trail")]
+    [SerializeField] private GhostTrail ghostTrail;
+
+
+    [Header("References")]
+    public Rigidbody2D rb;
+    public Animator animator;
+    bool isFacingRight = true;
+    bool wasGrounded;
+    public ParticleSystem smokeFX;
+    public Collider2D playerCollider; // Добавьте эту ссылку
+
+    [Header("Movement")]
+    public float moveSpeed = 5f;
+    float horizontalMovement;
+
+    [Header("Dashing")]
+    public float dashSpeed = 25f;
+    float dashDuration = 0.2f;
+    public float dashCooldown = 0.5f;
+    bool isDashing;
+    bool canDash = true;
+    TrailRenderer trailRenderer;
+
+    [Header("Jumping")]
+    public float jumpPower = 10f;
+    public int maxJumps = 2;
+    private int jumpsRemaining;
+
+    [Header("Ground Check")]
+    public Transform groundCheckPos;
+    public Vector2 groundCheckSize = new Vector2(0.49f, 0.03f);
+    public LayerMask groundLayer;
+    bool isGrounded;
+
+    [Header("Wall Check")]
+    public Transform wallCheckPos;
+    public Vector2 wallCheckSize = new Vector2(0.49f, 0.03f);
+    public LayerMask wallLayer;
+
+    [Header("Gravity")]
+    public float baseGravity = 2f;
+    public float maxFallSpeed = 18f;
+    public float fallGravityMult = 2f;
+
+    [Header("Wall Movement")]
+    public float wallSlideSpeed = 2f;
+    bool isWallSliding;
+
+    [Header("Wall Jump")]
+    bool isWallJumping;
+    float wallJumpDirection;
+    public float wallJumpTime = 0.2f;
+    float wallJumpTimer;
+    public Vector2 wallJumpPower = new Vector2(5f, 10f);
+
+    [Header("Platform Drop")]
+    public float dropSpeed = 8f; // Скорость спуска
+    public float dropDisableTime = 0.3f; // Время игнорирования платформы
+    bool isDroppingFromPlatform = false;
+
+    private void Start()
+    {
+        trailRenderer = GetComponent<TrailRenderer>();
+        if (trailRenderer == null)
+        {
+            Debug.LogError("TrailRenderer не найден на объекте!");
+        }
+
+        // Если не назначен коллайдер в инспекторе, пытаемся найти его
+        if (playerCollider == null)
+        {
+            playerCollider = GetComponent<Collider2D>();
+        }
+
+        impulseSource = GetComponent<CinemachineImpulseSource>();
+
+
+    }
+
+    void Update()
+    {
+        animator.SetFloat("yVelocity", rb.linearVelocity.y);
+        animator.SetFloat("magnitude", rb.linearVelocity.magnitude);
+        animator.SetBool("isWallSliding", isWallSliding);
+
+        if (isDashing)
+        {
+            return;
+        }
+
+        GroundCheck();
+        ProcessGravity();
+        ProcessWallSlide();
+        ProcessWallJump();
+
+        if (!isWallJumping)
+        {
+            rb.linearVelocity = new Vector2(horizontalMovement * moveSpeed, rb.linearVelocity.y);
+            Flip();
+        }
+    }
+
+    // Метод для спуска с платформы
+    public void DropFromPlatform(InputAction.CallbackContext context)
+    {
+        if (context.performed && isGrounded && !isDashing && !isWallJumping)
+        {
+            StartCoroutine(DropFromPlatformCoroutine());
+        }
+    }
+
+    private IEnumerator DropFromPlatformCoroutine()
+    {
+        if (isDroppingFromPlatform) yield break;
+
+        isDroppingFromPlatform = true;
+
+        // Ищем платформы под ногами
+        Collider2D[] platforms = Physics2D.OverlapBoxAll(
+            groundCheckPos.position,
+            groundCheckSize,
+            0,
+            LayerMask.GetMask("OverPlatform") // Убедитесь, что слой правильный
+        );
+
+        if (platforms.Length > 0 && playerCollider != null)
+        {
+            // Временно отключаем столкновение со всеми найденными платформами
+            foreach (Collider2D platform in platforms)
+            {
+                if (platform != null && platform.GetComponent<PlatformEffector2D>() != null)
+                {
+                    Physics2D.IgnoreCollision(playerCollider, platform, true);
+                }
+            }
+
+            // Применяем скорость вниз для спуска
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, -dropSpeed);
+
+            // Ждём
+            yield return new WaitForSeconds(dropDisableTime);
+
+            // Восстанавливаем столкновение
+            foreach (Collider2D platform in platforms)
+            {
+                if (platform != null && platform.GetComponent<PlatformEffector2D>() != null)
+                {
+                    Physics2D.IgnoreCollision(playerCollider, platform, false);
+                }
+            }
+        }
+
+        isDroppingFromPlatform = false;
+    }
+
+    // ... остальные методы остаются без изменений ...
+
+    public void Move(InputAction.CallbackContext context)
+    {
+        horizontalMovement = context.ReadValue<Vector2>().x;
+    }
+
+    public void Dash(InputAction.CallbackContext context)
+    {
+        Debug.Log($"Dash input: {context.performed}, CanDash: {canDash}, IsDashing: {isDashing}");
+
+        CameraShakeManager.Instance.Shake(impulseSource);
+
+        // Добавляем эффект ripple при рывке
+        if (rippleEffect != null && context.performed)
+        {
+            // Вычисляем позицию для ripple (центр экрана или позиция игрока на экране)
+            rippleEffect.Emit(new Vector2(0.5f, 0.5f));
+
+            // Можно регулировать параметры ripple для рывка
+            StartCoroutine(AdjustRippleForDash());
+        }
+
+
+
+        if (context.performed && canDash && !isDashing)
+        {
+            StartCoroutine(DashCoroutine());
+        }
+    }
+
+
+
+    private IEnumerator AdjustRippleForDash()
+{
+    if (rippleEffect == null) yield break;
+    
+    // Сохраняем оригинальные значения
+    float originalRefraction = rippleEffect.refractionStrength;
+    float originalReflection = rippleEffect.reflectionStrength;
+    float originalWaveSpeed = rippleEffect.waveSpeed;
+    
+    // Увеличиваем эффект для рывка
+    rippleEffect.refractionStrength = Mathf.Min(originalRefraction * 1.5f, 1.0f);
+    rippleEffect.reflectionStrength = Mathf.Min(originalReflection * 1.3f, 1.0f);
+    rippleEffect.waveSpeed = originalWaveSpeed * 0.8f; // Немного замедляем волны
+    
+    // Ждем короткое время
+    yield return new WaitForSeconds(0.3f);
+    
+    // Возвращаем оригинальные значения
+    rippleEffect.refractionStrength = originalRefraction;
+    rippleEffect.reflectionStrength = originalReflection;
+    rippleEffect.waveSpeed = originalWaveSpeed;
+}
+
+
+
+    private IEnumerator DashCoroutine()
+    {
+        if (isDashing) yield break;
+
+        Debug.Log("DASH STARTED!");
+
+        ghostTrail?.PlayTrail();
+
+
+        canDash = false;
+        isDashing = true;
+
+        if (trailRenderer != null)
+        {
+            trailRenderer.emitting = true;
+        }
+
+        float dashDirection;
+        if (Mathf.Abs(horizontalMovement) > 0.1f)
+        {
+            dashDirection = Mathf.Sign(horizontalMovement);
+        }
+        else
+        {
+            dashDirection = isFacingRight ? 1f : -1f;
+        }
+
+        float originalGravity = rb.gravityScale;
+        rb.gravityScale = 0f;
+
+        float originalYVelocity = rb.linearVelocity.y;
+
+        rb.linearVelocity = new Vector2(
+            dashDirection * dashSpeed,
+            originalYVelocity
+        );
+
+        yield return new WaitForSeconds(dashDuration);
+
+        rb.gravityScale = originalGravity;
+
+        if (Mathf.Abs(horizontalMovement) > 0.1f)
+        {
+            rb.linearVelocity = new Vector2(
+                horizontalMovement * moveSpeed,
+                rb.linearVelocity.y
+            );
+        }
+        else
+        {
+            rb.linearVelocity = new Vector2(
+                0f,
+                rb.linearVelocity.y
+            );
+        }
+
+        if (trailRenderer != null)
+        {
+            trailRenderer.emitting = false;
+        }
+
+        isDashing = false;
+        Debug.Log("DASH ENDED!");
+
+        yield return new WaitForSeconds(dashCooldown);
+        canDash = true;
+        Debug.Log("DASH READY AGAIN!");
+    }
+
+    public void Jump(InputAction.CallbackContext context)
+    {
+        if (context.performed && wallJumpTimer > 0f)
+        {
+            isWallJumping = true;
+
+            rb.linearVelocity = new Vector2(
+                wallJumpDirection * wallJumpPower.x,
+                wallJumpPower.y
+            );
+
+            wallJumpTimer = 0f;
+            JumpFX();
+
+            Invoke(nameof(CancelWallJump), wallJumpTime);
+            return;
+        }
+
+        if (context.performed && jumpsRemaining > 0)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpPower);
+            jumpsRemaining--;
+            JumpFX();
+        }
+
+        if (context.canceled && rb.linearVelocity.y > 0)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
+        }
+    }
+
+    private void JumpFX()
+    {
+        animator.SetTrigger("jump");
+        if (smokeFX != null)
+        {
+            smokeFX.Play();
+        }
+    }
+
+    private void GroundCheck()
+    {
+        bool groundedNow = Physics2D.OverlapBox(
+            groundCheckPos.position,
+            groundCheckSize,
+            0,
+            groundLayer
+        );
+
+        // ?? ПРИЗЕМЛЕНИЕ
+        if (!wasGrounded && groundedNow)
+        {
+            OnLand();
+        }
+
+        isGrounded = groundedNow;
+        wasGrounded = groundedNow;
+
+        if (isGrounded)
+        {
+            jumpsRemaining = maxJumps;
+            canDash = true;
+        }
+    }
+
+    private void OnLand()
+    {
+        animator.SetTrigger("land");
+
+        if (smokeFX != null)
+        {
+            smokeFX.Play();
+        }
+    }
+
+
+
+    private bool WallCheck()
+    {
+        return Physics2D.OverlapBox(wallCheckPos.position, wallCheckSize, 0, wallLayer);
+    }
+
+    private void ProcessGravity()
+    {
+        if (rb.linearVelocity.y < 0)
+        {
+            rb.gravityScale = baseGravity * fallGravityMult;
+            rb.linearVelocity = new Vector2(
+                rb.linearVelocity.x,
+                Mathf.Max(rb.linearVelocity.y, -maxFallSpeed)
+            );
+        }
+        else
+        {
+            rb.gravityScale = baseGravity;
+        }
+    }
+
+    private void ProcessWallSlide()
+    {
+        if (!isGrounded && WallCheck() && horizontalMovement != 0 && Mathf.Sign(horizontalMovement) == Mathf.Sign(transform.localScale.x))
+        {
+            isWallSliding = true;
+
+            rb.linearVelocity = new Vector2(
+                rb.linearVelocity.x,
+                Mathf.Max(rb.linearVelocity.y, -wallSlideSpeed)
+            );
+        }
+        else
+        {
+            isWallSliding = false;
+        }
+    }
+
+    private void ProcessWallJump()
+    {
+        if (isWallSliding)
+        {
+            isWallJumping = false;
+            wallJumpDirection = -transform.localScale.x;
+            wallJumpTimer = wallJumpTime;
+
+            CancelInvoke(nameof(CancelWallJump));
+        }
+        else if (wallJumpTimer > 0f)
+        {
+            wallJumpTimer -= Time.deltaTime;
+        }
+    }
+
+    private void CancelWallJump()
+    {
+        isWallJumping = false;
+    }
+
+    private void Flip()
+    {
+        if (horizontalMovement == 0) return;
+
+        if (isFacingRight && horizontalMovement < 0 ||
+            !isFacingRight && horizontalMovement > 0)
+        {
+            isFacingRight = !isFacingRight;
+
+            Vector3 scale = transform.localScale;
+            scale.x *= -1f;
+            transform.localScale = scale;
+
+            if (rb.linearVelocity.y == 0 && smokeFX != null)
+            {
+                smokeFX.Play();
+            }
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (groundCheckPos != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireCube(groundCheckPos.position, groundCheckSize);
+        }
+
+        if (wallCheckPos != null)
+        {
+            Gizmos.color = Color.blue;
+            Gizmos.DrawWireCube(wallCheckPos.position, wallCheckSize);
+        }
+    }
+}

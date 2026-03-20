@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 3
+  tags:
+  - Background
+  - UI
+  - Trap
+  - Enemy
+  - Boss
+  - Chain
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - Ground
+  - Water
+  - UI
+  - Wall
+  - Platform
+  - Player
+  - Decoration
+  - VFX
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Background
+    uniqueID: 2808810719
+    locked: 0
+  - name: Ground
+    uniqueID: 1664792015
+    locked: 0
+  - name: Wall
+    uniqueID: 3665032427
+    locked: 0
+  - name: Platform
+    uniqueID: 3062885833
+    locked: 0
+  - name: Player
+    uniqueID: 1693260379
+    locked: 0
+  - name: Decoration
+    uniqueID: 1337103201
+    locked: 0
+  - name: VFX
+    uniqueID: 1576564589
+    locked: 0
+  - name: UI
+    uniqueID: 3557156095
+    locked: 0
+  m_RenderingLayers:
+  - Default
