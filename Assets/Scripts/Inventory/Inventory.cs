@@ -6,8 +6,9 @@ public class Inventory : MonoBehaviour
     public static Inventory Instance;
 
     public int maxSlots = 20;
-
     public List<InventorySlot> items = new List<InventorySlot>();
+
+    public InventoryUI inventoryUI;
 
     private void Awake()
     {
@@ -23,6 +24,7 @@ public class Inventory : MonoBehaviour
             if (slot.item == item && item.stackable && slot.amount < item.maxStack)
             {
                 slot.amount++;
+                inventoryUI.Refresh(); // 🔥 обновляем UI
                 return true;
             }
         }
@@ -31,6 +33,7 @@ public class Inventory : MonoBehaviour
         if (items.Count < maxSlots)
         {
             items.Add(new InventorySlot(item, 1));
+            inventoryUI.Refresh(); // 🔥 обновляем UI
             return true;
         }
 
@@ -48,6 +51,7 @@ public class Inventory : MonoBehaviour
                 if (slot.amount <= 0)
                     items.Remove(slot);
 
+                inventoryUI.Refresh(); // 🔥 обновляем UI
                 return;
             }
         }

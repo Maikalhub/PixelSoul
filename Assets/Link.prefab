@@ -29,7 +29,7 @@ Transform:
   m_GameObject: {fileID: 4934566399437482340}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.03, y: -1.34, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -82,7 +82,7 @@ SpriteRenderer:
   m_SortingLayerID: 1337103201
   m_SortingLayer: 6
   m_SortingOrder: 0
-  m_Sprite: {fileID: 1579348407823272833, guid: 69e9ad5c7c200e0458f7567c810d8b05, type: 3}
+  m_Sprite: {fileID: -1041347206, guid: a58834c233d3ee54a857c80123208d15, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -173,7 +173,7 @@ HingeJoint2D:
   m_BreakAction: 3
   m_AutoConfigureConnectedAnchor: 1
   m_Anchor: {x: 0.009271145, y: 0.5493474}
-  m_ConnectedAnchor: {x: -0.020729065, y: -0.79065275}
+  m_ConnectedAnchor: {x: -28.990728, y: 1.5493474}
   m_UseConnectedAnchor: 1
   m_UseMotor: 0
   m_Motor:

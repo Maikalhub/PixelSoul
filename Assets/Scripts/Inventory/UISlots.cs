@@ -1,19 +1,17 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
+using TMPro; // 🔥 ВАЖНО
 
 public class UISlot : MonoBehaviour
 {
     public Image icon;
-    public TMP_Text amountText;
+    public TMP_Text amountText; // 🔥 вместо Text
 
     public void Setup(InventorySlot slot)
     {
         icon.sprite = slot.item.icon;
 
-        if (slot.amount >= 1)
-            amountText.text = slot.amount.ToString();
-        else
-            amountText.text = "";
+        // если 1 — не показываем число
+        amountText.text = slot.amount > 1 ? slot.amount.ToString() : "";
     }
 }

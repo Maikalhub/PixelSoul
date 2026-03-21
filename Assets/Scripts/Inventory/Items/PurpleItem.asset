@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b9d2b93b096ef74cb938acbe4c0d91a, type: 3}
   m_Name: PurpleItem
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: 
-  icon: {fileID: 0}
+  itemName: PurpleGem
+  icon: {fileID: 21300000, guid: 5554256ad6f6adc4e89744c55b1122b0, type: 3}
   stackable: 1
   maxStack: 99

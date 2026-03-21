@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: BlueItem
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   itemName: BlueGem
-  icon: {fileID: 21300000, guid: ffd2014202fc74e42be3f098a6af65b1, type: 3}
+  icon: {fileID: 21300000, guid: f447053eae123a945a5bb9f995eaf8ec, type: 3}
   stackable: 1
   maxStack: 20
