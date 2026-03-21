@@ -8,7 +8,7 @@ public class SkillPanel : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.L))
         {
-            inventoryPanel.SetActive(true);
+            inventoryPanel.SetActive(!inventoryPanel.activeSelf);
         }
     }
 }

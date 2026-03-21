@@ -14,5 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   itemName: Bones
   icon: {fileID: -4288824465210313546, guid: bdbffa39844dd5443bd544bcee4e467d, type: 3}
+  description: aCSDCSDCSDC
+  itemType: 0
+  damage: 34
+  defense: 0
+  health: 0
   stackable: 1
   maxStack: 99

@@ -4,32 +4,57 @@ using UnityEngine.UI;
 [System.Serializable]
 public class LayoutStep
 {
-    public int maxItems;          // до скольки предметов действует правило
-    public int columns;           // сколько в строке
-    public Vector2 cellSize;      // размер слота
+    public int maxItems;
+    public int columns;
+    public Vector2 cellSize;
 }
 
 public class InventoryUI : MonoBehaviour
 {
     public GameObject slotPrefab;
     public Transform slotParent;
-
-    public LayoutStep[] layoutSteps; // 🔥 настраивается в инспекторе
+    public LayoutStep[] layoutSteps;
 
     private GridLayoutGroup grid;
+    private bool initialized = false;
 
     void Awake()
     {
-        grid = slotParent.GetComponent<GridLayoutGroup>();
+        Init();
     }
 
     void OnEnable()
     {
+        Init();
         Refresh();
+    }
+
+    void Init()
+    {
+        if (initialized) return;
+
+        if (slotParent == null)
+        {
+            Debug.LogError("slotParent НЕ назначен!");
+            return;
+        }
+
+        grid = slotParent.GetComponent<GridLayoutGroup>();
+
+        if (grid == null)
+        {
+            Debug.LogError("Нет GridLayoutGroup на slotParent!");
+            return;
+        }
+
+        initialized = true;
     }
 
     public void Refresh()
     {
+        if (!initialized || Inventory.Instance == null)
+            return;
+
         foreach (Transform child in slotParent)
             Destroy(child.gameObject);
 
@@ -47,6 +72,9 @@ public class InventoryUI : MonoBehaviour
 
     void UpdateLayout(int itemCount)
     {
+        if (layoutSteps == null || layoutSteps.Length == 0)
+            return;
+
         foreach (var step in layoutSteps)
         {
             if (itemCount <= step.maxItems)
@@ -58,7 +86,6 @@ public class InventoryUI : MonoBehaviour
             }
         }
 
-        // если больше всех значений
         var last = layoutSteps[layoutSteps.Length - 1];
         grid.constraintCount = last.columns;
         grid.cellSize = last.cellSize;

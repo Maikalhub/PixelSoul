@@ -229,6 +229,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UISlot
   icon: {fileID: 4080096412252711351}
   amountText: {fileID: 121409546235914835}
+  button: {fileID: 294011008833246638}
 --- !u!114 &294011008833246638
 MonoBehaviour:
   m_ObjectHideFlags: 0
