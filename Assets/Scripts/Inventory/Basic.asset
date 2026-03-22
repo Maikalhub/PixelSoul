@@ -19,4 +19,4 @@ MonoBehaviour:
   damageBoost: 0
   defenseBoost: 0
   healthBoost: 0
-  orderMatters: 1
+  orderMatters: 0
