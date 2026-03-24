@@ -102,8 +102,8 @@ public class PlayerMovement : MonoBehaviour
     public bool isDead;
 
     [Header("Stamina")]
-    public int maxStamina = 100;
-    public int currentStamina;
+    public float maxStamina = 100;
+    public float currentStamina;
     public float staminaRegenRate = 15f; // Скорость восстановления стамины в секунду
     public float staminaRegenDelay = 1f; // Задержка перед восстановлением
     private float staminaRegenTimer; // Таймер для задержки восстановления

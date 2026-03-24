@@ -1,15 +1,16 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
     [Header("Health UI")]
-    public SpriteRenderer healthRenderer;       // Спрайт для здоровья
-    public Sprite[] healthSprites;              // Массив спрайтов от пустого до полного (10 шт)
-    [Range(0f, 1f)] public float healthBlinkThreshold = 0.25f; // порог мигания
-    public float healthBlinkSpeed = 5f;        // скорость мигания
+    public Image healthImage;              // Image вместо SpriteRenderer
+    public Sprite[] healthSprites;         // спрайты (0 ? пусто, последний ? фул)
+    [Range(0f, 1f)] public float healthBlinkThreshold = 0.25f;
+    public float healthBlinkSpeed = 5f;
 
     [Header("Stamina UI")]
-    public SpriteRenderer staminaBar;           // один спрайт, цвет меняется
+    public Image staminaImage;             // Image вместо SpriteRenderer
     public Color staminaFullColor = Color.green;
     public Color staminaEmptyColor = Color.red;
     [Range(0f, 1f)] public float staminaBlinkThreshold = 0.25f;
@@ -28,42 +29,43 @@ public class UIManager : MonoBehaviour
 
     void UpdateHealthUI()
     {
-        if (healthRenderer == null || healthSprites.Length == 0) return;
+        if (healthImage == null || healthSprites.Length == 0) return;
 
         float healthPercent = (float)player.currentHealth / player.maxHealth;
         int spriteIndex = Mathf.RoundToInt(healthPercent * (healthSprites.Length - 1));
-        healthRenderer.sprite = healthSprites[spriteIndex];
 
-        // Мигание, если здоровье ниже порога
+        healthImage.sprite = healthSprites[spriteIndex];
+
+        // Мигание
         if (healthPercent <= healthBlinkThreshold)
         {
             float alpha = Mathf.Abs(Mathf.Sin(Time.time * healthBlinkSpeed));
-            Color c = healthRenderer.color;
+            Color c = healthImage.color;
             c.a = alpha;
-            healthRenderer.color = c;
+            healthImage.color = c;
         }
         else
         {
-            Color c = healthRenderer.color;
+            Color c = healthImage.color;
             c.a = 1f;
-            healthRenderer.color = c;
+            healthImage.color = c;
         }
     }
 
     void UpdateStaminaUI()
     {
-        if (staminaBar == null) return;
+        if (staminaImage == null) return;
 
         float staminaPercent = (float)player.currentStamina / player.maxStamina;
         Color targetColor = Color.Lerp(staminaEmptyColor, staminaFullColor, staminaPercent);
 
-        // Мигание при критическом уровне
+        // Мигание
         if (staminaPercent <= staminaBlinkThreshold)
         {
             float blink = Mathf.Abs(Mathf.Sin(Time.time * staminaBlinkSpeed));
             targetColor = Color.Lerp(staminaEmptyColor, staminaFullColor, blink);
         }
 
-        staminaBar.color = targetColor;
+        staminaImage.color = targetColor;
     }
 }

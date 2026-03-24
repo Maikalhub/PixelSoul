@@ -10,9 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b9d2b93b096ef74cb938acbe4c0d91a, type: 3}
-  m_Name: PurpleItem
+  m_Name: SkullItem
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: PurpleGem
-  icon: {fileID: 21300000, guid: 5554256ad6f6adc4e89744c55b1122b0, type: 3}
+  itemName: SkullGem
+  icon: {fileID: -4942783983749143313, guid: bdbffa39844dd5443bd544bcee4e467d, type: 3}
+  description: Skull gem that drops from enemies that do not increase stats
+  itemType: 0
+  damage: 0
+  defense: 0
+  health: 0
   stackable: 1
   maxStack: 99

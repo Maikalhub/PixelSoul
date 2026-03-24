@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RecipeData
   inputs:
   - {fileID: 11400000, guid: f153dbbad60f9e646ab301d65e9541cc, type: 2}
-  - {fileID: 11400000, guid: 862029563f786c140954a9bd3cbe89eb, type: 2}
-  result: {fileID: 11400000, guid: ee6a4a867a6e53644adde01bcc0b1180, type: 2}
+  - {fileID: 11400000, guid: 8d1e72befe5a10846a91aa2fb083e939, type: 2}
+  result: {fileID: 11400000, guid: 7795192056bfee64cb71099d76fe7564, type: 2}
   damageBoost: 0
   defenseBoost: 0
   healthBoost: 0
