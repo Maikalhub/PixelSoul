@@ -12,6 +12,8 @@ TagManager:
   - Chain
   - LevelTransition
   - ChainLink
+  - Level
+  - AttackCheck
   layers:
   - Default
   - TransparentFX
