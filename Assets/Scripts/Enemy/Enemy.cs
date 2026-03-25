@@ -1,4 +1,3 @@
-using NUnit.Framework;
 using System.Collections;
 using UnityEngine;
 using RangeAttribute = UnityEngine.RangeAttribute;
@@ -12,31 +11,11 @@ public class EnemyAI : MonoBehaviour
     // ENUMS
     // =====================================================
 
-    public enum AIState
-    {
-        Patrolling,
-        Chasing,
-        Attacking,
-        Evading,
-        Idle,
-        Alert,
-        Retreating,
-        Fleeing
-    }
+    public enum AIState { Patrolling, Chasing, Attacking, Evading, Idle, Alert, Retreating, Fleeing }
 
-    public enum MovementMode
-    {
-        GroundOnly,
-        SmartJump,
-        JumpOnly
-    }
+    public enum MovementMode { GroundOnly, SmartJump, JumpOnly }
 
-    public enum AttackType
-    {
-        Standard,
-        Charge,
-        Ranged
-    }
+    public enum AttackType { Standard, Charge, Ranged }
 
     // =====================================================
     // SETTINGS
@@ -97,24 +76,6 @@ public class EnemyAI : MonoBehaviour
     [Header("Direction")]
     public bool isFacingRight = true;
 
-    // =====================
-    // ===== DROP ITEMS ====
-    // =====================
-    [System.Serializable]
-    public class DropItem
-    {
-        public GameObject prefab;
-        [Range(0f, 1f)] public float dropChance = 1f;
-    }
-
-    [Header("Drop Settings")]
-    public DropItem[] drops;
-    public float dropForce = 3f;
-    public string dropLayerName = "DropItem";
-
-    // =====================
-    // ==== BEHAVIOR FLAGS ==
-    // =====================
     [Header("Behavior Flags")]
     public bool canFlee = true;
     public bool canRetreat = true;
@@ -122,21 +83,40 @@ public class EnemyAI : MonoBehaviour
     public bool canChase = true;
     public bool canAttack = true;
 
+    [System.Serializable]
+    public class DropItem
+    {
+        public GameObject prefab;
+        [Range(0f, 1f)] public float dropChance = 1f;
+    }
+
+    // А `[Header]` ставим над полем массива DropItem
+    [Header("Drop Settings")]
+    public DropItem[] drops;
+    public float dropForce = 3f;
+    public string dropLayerName = "DropItem";
+    // =====================================================
+    // STUN SETTINGS
+    // =====================================================
+    [Header("Stun Settings")]
+    public float stunDuration = 1f;
+    public Color stunColor = Color.red;
+    public float blinkFrequency = 0.2f;
+
     // =====================================================
     // PRIVATE
     // =====================================================
-
     private Rigidbody2D rb;
     private Animator animator;
     private Transform player;
-
     private int currentPatrolIndex;
     private float lastAttackTime;
     private float lastJumpTime;
-
     private bool isDead;
     private bool isCharging;
-    private float directionTolerance = 0.2f;
+    private bool isStunned;
+    private SpriteRenderer spriteRenderer;
+    private Color originalColor;
 
     // =====================================================
     // UNITY METHODS
@@ -147,12 +127,17 @@ public class EnemyAI : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         player = GameObject.FindWithTag("Player")?.transform;
+
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+            originalColor = spriteRenderer.color;
+
         currentPatrolIndex = 0;
     }
 
     private void Update()
     {
-        if (isDead || player == null) return;
+        if (isDead || player == null || isStunned) return;
 
         float distance = Vector2.Distance(transform.position, player.position);
 
@@ -165,7 +150,7 @@ public class EnemyAI : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (isDead || isCharging) return;
+        if (isDead || isCharging || isStunned) return;
 
         switch (currentState)
         {
@@ -183,7 +168,6 @@ public class EnemyAI : MonoBehaviour
     // =====================================================
     // STATE LOGIC
     // =====================================================
-
     private void HandleStateTransitions(float distance)
     {
         float healthPercent = health / 100f;
@@ -236,8 +220,7 @@ public class EnemyAI : MonoBehaviour
         FaceTarget(target);
 
         float dir = isFacingRight ? 1 : -1;
-
-        rb.linearVelocity = new Vector2(dir * patrolSpeed, rb.linearVelocity.y);
+        rb.velocity = new Vector2(dir * patrolSpeed, rb.velocity.y);
 
         if (Vector2.Distance(transform.position, target) < 0.3f)
             currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
@@ -257,7 +240,7 @@ public class EnemyAI : MonoBehaviour
         switch (movementMode)
         {
             case MovementMode.GroundOnly:
-                rb.linearVelocity = new Vector2(dir * chaseSpeed, rb.linearVelocity.y);
+                rb.velocity = new Vector2(dir * chaseSpeed, rb.velocity.y);
                 break;
 
             case MovementMode.SmartJump:
@@ -271,7 +254,7 @@ public class EnemyAI : MonoBehaviour
                     TryJump(dir);
                     return;
                 }
-                rb.linearVelocity = new Vector2(dir * chaseSpeed, rb.linearVelocity.y);
+                rb.velocity = new Vector2(dir * chaseSpeed, rb.velocity.y);
                 break;
 
             case MovementMode.JumpOnly:
@@ -298,7 +281,7 @@ public class EnemyAI : MonoBehaviour
 
     private void StandardAttack()
     {
-        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+        rb.velocity = new Vector2(0, rb.velocity.y);
         animator.SetTrigger("attack");
     }
 
@@ -313,18 +296,18 @@ public class EnemyAI : MonoBehaviour
 
         while (timer < chargeDuration)
         {
-            rb.linearVelocity = new Vector2(dir * chargeSpeed, rb.linearVelocity.y);
+            rb.velocity = new Vector2(dir * chargeSpeed, rb.velocity.y);
             timer += Time.deltaTime;
             yield return null;
         }
 
-        rb.linearVelocity = Vector2.zero;
+        rb.velocity = Vector2.zero;
         isCharging = false;
     }
 
     private void RangedAttack()
     {
-        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+        rb.velocity = new Vector2(0, rb.velocity.y);
         animator.SetTrigger("attack");
 
         if (bulletPrefab == null || firePoint == null) return;
@@ -342,26 +325,26 @@ public class EnemyAI : MonoBehaviour
     {
         if (!canEvade) return;
         float dir = player.position.x > transform.position.x ? -1 : 1;
-        rb.linearVelocity = new Vector2(dir * chaseSpeed, rb.linearVelocity.y);
+        rb.velocity = new Vector2(dir * chaseSpeed, rb.velocity.y);
     }
 
     private void RetreatBehavior()
     {
         if (!canRetreat) return;
         float dir = player.position.x > transform.position.x ? -1 : 1;
-        rb.linearVelocity = new Vector2(dir * patrolSpeed, rb.linearVelocity.y);
+        rb.velocity = new Vector2(dir * patrolSpeed, rb.velocity.y);
     }
 
     private void FleeBehavior()
     {
         if (!canFlee) return;
         float dir = player.position.x > transform.position.x ? -1 : 1;
-        rb.linearVelocity = new Vector2(dir * chaseSpeed, rb.linearVelocity.y);
+        rb.velocity = new Vector2(dir * chaseSpeed, rb.velocity.y);
     }
 
     private void IdleBehavior()
     {
-        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+        rb.velocity = new Vector2(0, rb.velocity.y);
     }
 
     // =====================================================
@@ -374,7 +357,7 @@ public class EnemyAI : MonoBehaviour
 
         lastJumpTime = Time.time;
         animator.SetTrigger("jump");
-        rb.linearVelocity = new Vector2(dir * jumpForwardForce, jumpForce);
+        rb.velocity = new Vector2(dir * jumpForwardForce, jumpForce);
     }
 
     private bool IsGrounded()
@@ -400,10 +383,10 @@ public class EnemyAI : MonoBehaviour
     }
 
     // =====================================================
-    // DAMAGE
+    // DAMAGE + STUN
     // =====================================================
 
-    public void TakeDamageMethod(float damage)
+    public void TakeDamageMethod(float damage, bool applyStun = false)
     {
         if (isDead) return;
 
@@ -411,8 +394,39 @@ public class EnemyAI : MonoBehaviour
         animator.SetTrigger("Hit");
         Debug.Log($"Enemy took damage: {damage} | HP: {health}");
 
+        if (applyStun && !isStunned)
+            StartCoroutine(StunCoroutine(stunDuration));
+
         if (health <= 0)
             Die();
+    }
+
+    private IEnumerator StunCoroutine(float duration)
+    {
+        isStunned = true;
+        rb.velocity = Vector2.zero;
+        currentState = AIState.Idle;
+
+        float timer = 0f;
+        bool colorToggle = false;
+
+        while (timer < duration)
+        {
+            timer += blinkFrequency;
+
+            if (spriteRenderer != null)
+            {
+                colorToggle = !colorToggle;
+                spriteRenderer.color = colorToggle ? stunColor : originalColor;
+            }
+
+            yield return new WaitForSeconds(blinkFrequency);
+        }
+
+        if (spriteRenderer != null)
+            spriteRenderer.color = originalColor;
+
+        isStunned = false;
     }
 
     private void Die()
@@ -420,7 +434,6 @@ public class EnemyAI : MonoBehaviour
         isDead = true;
         float pickupDelay = 0.5f;
 
-        // === ДРОП ВВЕРХ (180°) ===
         foreach (var drop in drops)
         {
             if (drop.prefab == null) continue;

@@ -32,6 +32,15 @@ public class PlayerMovement : MonoBehaviour
     [Header("Movement")]
     public float moveSpeed = 5f;
     float horizontalMovement;
+
+    [Header("Acceleration")]
+    public float acceleration = 15f;
+    public float deceleration = 20f;
+
+    [Header("Sprint")]
+    public float sprintMultiplier = 1.8f;
+    private bool isSprinting;
+
     //
     [Header("Dashing")]
     public float dashSpeed = 25f;
@@ -116,6 +125,19 @@ public class PlayerMovement : MonoBehaviour
     public int throwStaminaCost = 25;
     public int sprintStaminaCost = 5; // Стоимость спринта в секунду (если будет спринт)
 
+    // === ДОБАВЛЕНО В Jumping ===
+    [Header("Jump Buffer")]
+    public float jumpBufferTime = 0.15f;
+    private float jumpBufferCounter;
+
+    [Header("Death UI")]
+    public CanvasGroup deathPanel;   // Панель с Image на весь экран
+    public float fadeDuration = 1f;  // Длительность затемнения
+    public GameObject deathText;     // Надпись "Смерть"
+    public GameObject restartButton;
+    public GameObject mainMenuButton;
+
+
     private void Start()
     {
         TriggerRipple();
@@ -135,13 +157,30 @@ public class PlayerMovement : MonoBehaviour
         }
 
         impulseSource = GetComponent<CinemachineImpulseSource>();
-    }
 
+
+        // Скрываем панель и кнопки
+        if (deathPanel != null)
+        {
+            deathPanel.alpha = 0f;
+            deathPanel.interactable = false;
+            deathPanel.blocksRaycasts = false;
+        }
+
+        if (deathText != null) deathText.SetActive(false);
+        if (restartButton != null) restartButton.SetActive(false);
+        if (mainMenuButton != null) mainMenuButton.SetActive(false);
+
+    }
     void Update()
     {
-        animator.SetFloat("yVelocity", rb.linearVelocity.y);
-        animator.SetFloat("magnitude", rb.linearVelocity.magnitude);
+        animator.SetFloat("yVelocity", rb.velocity.y);
+        animator.SetFloat("magnitude", rb.velocity.magnitude);
         animator.SetBool("isWallSliding", isWallSliding);
+
+        // jump buffer
+        if (jumpBufferCounter > 0)
+            jumpBufferCounter -= Time.deltaTime;
 
         // combo timer
         if (comboTimer > 0)
@@ -152,24 +191,38 @@ public class PlayerMovement : MonoBehaviour
         if (isDead)
             return;
 
-        // Восстановление стамины
         HandleStaminaRegeneration();
 
-        if (isDashing)
+        GroundCheck();
+        HandleJumpBuffer();
+    }
+    private void FixedUpdate()
+    {
+        if (isDead || isDashing) return;
+
+        // --- движение по горизонтали ---
+        if (!isWallJumping)
         {
-            return;
+            float targetSpeed = horizontalMovement * moveSpeed;
+
+            if (isSprinting)
+                targetSpeed *= sprintMultiplier;
+
+            // плавное ускорение/замедление
+            float speedDiff = targetSpeed - rb.velocity.x;
+            float accelRate = Mathf.Abs(targetSpeed) > 0.01f ? acceleration : deceleration;
+
+            rb.velocity = new Vector2(rb.velocity.x + speedDiff * accelRate * Time.fixedDeltaTime, rb.velocity.y);
+
+            // поворот персонажа
+            if (horizontalMovement != 0)
+                Flip();
         }
 
-        GroundCheck();
+        // --- физика и гравитация ---
         ProcessGravity();
         ProcessWallSlide();
         ProcessWallJump();
-
-        if (!isWallJumping)
-        {
-            rb.linearVelocity = new Vector2(horizontalMovement * moveSpeed, rb.linearVelocity.y);
-            Flip();
-        }
     }
 
     // Метод для восстановления стамины
@@ -316,6 +369,16 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+
+    public void Sprint(InputAction.CallbackContext context)
+    {
+        if (context.performed)
+            isSprinting = true;
+
+        if (context.canceled)
+            isSprinting = false;
+    }
+
     public void Throw(InputAction.CallbackContext context)
     {
         if (context.performed && !isDead)
@@ -437,41 +500,9 @@ public class PlayerMovement : MonoBehaviour
 
     public void Jump(InputAction.CallbackContext context)
     {
-        if (context.performed && wallJumpTimer > 0f)
+        if (context.performed)
         {
-            // Проверяем наличие стамины для прыжка от стены
-            if (!TrySpendStamina(wallJumpStaminaCost))
-            {
-                Debug.Log("Недостаточно стамины для прыжка от стены!");
-                return;
-            }
-
-            isWallJumping = true;
-
-            rb.linearVelocity = new Vector2(
-                wallJumpDirection * wallJumpPower.x,
-                wallJumpPower.y
-            );
-
-            wallJumpTimer = 0f;
-            JumpFX();
-
-            Invoke(nameof(CancelWallJump), wallJumpTime);
-            return;
-        }
-
-        if (context.performed && jumpsRemaining > 0)
-        {
-            // Проверяем наличие стамины для прыжка
-            if (!TrySpendStamina(jumpStaminaCost))
-            {
-                Debug.Log("Недостаточно стамины для прыжка!");
-                return;
-            }
-
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpPower);
-            jumpsRemaining--;
-            JumpFX();
+            jumpBufferCounter = jumpBufferTime;
         }
 
         if (context.canceled && rb.linearVelocity.y > 0)
@@ -489,8 +520,83 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+
+    private void HandleJumpBuffer()
+    {
+        if (isDashing || isAttacking) return;
+
+        // WALL JUMP
+        if (jumpBufferCounter > 0 && wallJumpTimer > 0f)
+        {
+            if (!TrySpendStamina(wallJumpStaminaCost))
+                return;
+
+            isWallJumping = true;
+
+            rb.linearVelocity = new Vector2(
+                wallJumpDirection * wallJumpPower.x,
+                wallJumpPower.y
+            );
+
+            jumpBufferCounter = 0f;
+            wallJumpTimer = 0f;
+
+            JumpFX();
+            Invoke(nameof(CancelWallJump), wallJumpTime);
+            return;
+        }
+
+        // NORMAL / DOUBLE JUMP
+        if (jumpBufferCounter > 0 && jumpsRemaining > 0)
+        {
+            if (!TrySpendStamina(jumpStaminaCost))
+                return;
+
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpPower);
+            jumpsRemaining--;
+
+            jumpBufferCounter = 0f;
+
+            JumpFX();
+        }
+    }
+
+    private IEnumerator FadeDeathPanel(float targetAlpha)
+    {
+        if (deathPanel == null) yield break;
+
+        float startAlpha = deathPanel.alpha;
+        float elapsed = 0f;
+
+        // Если цель — показать, включаем взаимодействие сразу
+        if (targetAlpha > 0f)
+        {
+            deathPanel.interactable = true;
+            deathPanel.blocksRaycasts = true;
+        }
+
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            deathPanel.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / fadeDuration);
+            yield return null;
+        }
+
+        deathPanel.alpha = targetAlpha;
+
+        // Если скрываем — отключаем взаимодействие
+        if (targetAlpha == 0f)
+        {
+            deathPanel.interactable = false;
+            deathPanel.blocksRaycasts = false;
+        }
+    }
+
+
+
     private void GroundCheck()
     {
+
         bool groundedNow = Physics2D.OverlapBox(
             groundCheckPos.position,
             groundCheckSize,
@@ -616,21 +722,79 @@ public class PlayerMovement : MonoBehaviour
         rb.linearVelocity = Vector2.zero;
         rb.gravityScale = 0f;
 
-        // Коллайдер выключаем
         if (playerCollider != null)
             playerCollider.enabled = false;
 
-        StartCoroutine(Death());
-        SceneManager.LoadScene("Draft");
+        // Показать панель смерти
+        if (deathPanel != null)
+            StartCoroutine(ShowDeathUI());
+
+        // Не сразу перезагружаем сцену, ждём действия игрока
     }
+
+    private IEnumerator ShowDeathUI()
+    {
+        // Плавно затемняем
+        yield return StartCoroutine(FadeDeathPanel(1f));
+
+        // Показываем надпись и кнопки
+        if (deathText != null) deathText.SetActive(true);
+        if (restartButton != null) restartButton.SetActive(true);
+        if (mainMenuButton != null) mainMenuButton.SetActive(true);
+    }
+
+
+
+    public void RestartScene()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    public void ReturnToMenu()
+    {
+        SceneManager.LoadScene("Menu"); // замените на ваше имя сцены меню
+    }
+
 
     IEnumerator Death()
     {
         yield return new WaitForSeconds(10f); // немного подождать
     }
 
+    private IEnumerator FadeInDeathPanel()
+    {
+        float elapsed = 0f;
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            deathPanel.alpha = Mathf.Clamp01(elapsed / fadeDuration);
+            yield return null;
+        }
 
+        deathPanel.alpha = 1f;
 
+        // Делаем панель интерактивной после появления
+        deathPanel.interactable = true;
+        deathPanel.blocksRaycasts = true;
+    }
+    public void OnRestartButton()
+    {
+        StartCoroutine(FadeAndLoadScene(SceneManager.GetActiveScene().name));
+    }
+
+    public void OnMainMenuButton()
+    {
+        StartCoroutine(FadeAndLoadScene("Menu"));
+    }
+
+    private IEnumerator FadeAndLoadScene(string sceneName)
+    {
+        // Плавное затемнение, если нужно
+        if (deathPanel != null)
+            yield return StartCoroutine(FadeDeathPanel(1f));
+
+        SceneManager.LoadScene(sceneName);
+    }
 
     public void TakeDamage(int damage)
     {

@@ -23,7 +23,8 @@ public class BreakTile : MonoBehaviour
     {
         if (isBroken) return;
 
-        if (collision == attackCollider)
+        // проверяем по тегу "PlayerAttack", а не по коллайдеру напрямую
+        if (collision.CompareTag("PlayerAttack"))
         {
             isBroken = true;
             PlayBreakSound();
