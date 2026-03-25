@@ -1,5 +1,7 @@
-using UnityEngine;
+using NUnit.Framework;
 using System.Collections;
+using UnityEngine;
+using RangeAttribute = UnityEngine.RangeAttribute;
 
 [RequireComponent(typeof(Collider2D))]
 [RequireComponent(typeof(Rigidbody2D))]
@@ -95,6 +97,31 @@ public class EnemyAI : MonoBehaviour
     [Header("Direction")]
     public bool isFacingRight = true;
 
+    // =====================
+    // ===== DROP ITEMS ====
+    // =====================
+    [System.Serializable]
+    public class DropItem
+    {
+        public GameObject prefab;
+        [Range(0f, 1f)] public float dropChance = 1f;
+    }
+
+    [Header("Drop Settings")]
+    public DropItem[] drops;
+    public float dropForce = 3f;
+    public string dropLayerName = "DropItem";
+
+    // =====================
+    // ==== BEHAVIOR FLAGS ==
+    // =====================
+    [Header("Behavior Flags")]
+    public bool canFlee = true;
+    public bool canRetreat = true;
+    public bool canEvade = true;
+    public bool canChase = true;
+    public bool canAttack = true;
+
     // =====================================================
     // PRIVATE
     // =====================================================
@@ -131,7 +158,6 @@ public class EnemyAI : MonoBehaviour
 
         HandleStateTransitions(distance);
 
-        // isWalking только при патруле или преследовании
         animator.SetBool("isWalking",
             currentState == AIState.Patrolling ||
             currentState == AIState.Chasing);
@@ -162,31 +188,31 @@ public class EnemyAI : MonoBehaviour
     {
         float healthPercent = health / 100f;
 
-        if (healthPercent <= 0.1f)
+        if (healthPercent <= 0.1f && canFlee)
         {
             currentState = AIState.Fleeing;
             return;
         }
 
-        if (healthPercent <= retreatHealthThreshold)
+        if (healthPercent <= retreatHealthThreshold && canRetreat)
         {
             currentState = AIState.Retreating;
             return;
         }
 
-        if (distance <= attackRange)
+        if (distance <= attackRange && canAttack)
         {
             currentState = AIState.Attacking;
             return;
         }
 
-        if (distance < evadeRange)
+        if (distance < evadeRange && canEvade)
         {
             currentState = AIState.Evading;
             return;
         }
 
-        if (distance < sightRange)
+        if (distance < sightRange && canChase)
         {
             currentState = AIState.Chasing;
             return;
@@ -219,6 +245,8 @@ public class EnemyAI : MonoBehaviour
 
     private void ChaseBehavior()
     {
+        if (!canChase) return;
+
         float xDiff = player.position.x - transform.position.x;
         float dir = Mathf.Sign(xDiff);
 
@@ -255,23 +283,16 @@ public class EnemyAI : MonoBehaviour
 
     private void AttackBehavior()
     {
+        if (!canAttack) return;
         if (Time.time - lastAttackTime < attackCooldown) return;
 
         lastAttackTime = Time.time;
 
         switch (attackType)
         {
-            case AttackType.Standard:
-                StandardAttack();
-                break;
-
-            case AttackType.Charge:
-                StartCoroutine(ChargeAttack());
-                break;
-
-            case AttackType.Ranged:
-                RangedAttack();
-                break;
+            case AttackType.Standard: StandardAttack(); break;
+            case AttackType.Charge: StartCoroutine(ChargeAttack()); break;
+            case AttackType.Ranged: RangedAttack(); break;
         }
     }
 
@@ -284,7 +305,6 @@ public class EnemyAI : MonoBehaviour
     private IEnumerator ChargeAttack()
     {
         if (isCharging) yield break;
-
         isCharging = true;
         animator.SetTrigger("attack");
 
@@ -307,34 +327,34 @@ public class EnemyAI : MonoBehaviour
         rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
         animator.SetTrigger("attack");
 
-        if (bulletPrefab == null || firePoint == null)
-            return;
+        if (bulletPrefab == null || firePoint == null) return;
 
-        GameObject bullet =
-            Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
-
+        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
         Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
         if (bulletRb != null)
         {
             float dir = isFacingRight ? 1 : -1;
-            bulletRb.linearVelocity = new Vector2(dir * bulletSpeed, 0);
+            bulletRb.velocity = new Vector2(dir * bulletSpeed, 0);
         }
     }
 
     private void EvadeBehavior()
     {
+        if (!canEvade) return;
         float dir = player.position.x > transform.position.x ? -1 : 1;
         rb.linearVelocity = new Vector2(dir * chaseSpeed, rb.linearVelocity.y);
     }
 
     private void RetreatBehavior()
     {
+        if (!canRetreat) return;
         float dir = player.position.x > transform.position.x ? -1 : 1;
         rb.linearVelocity = new Vector2(dir * patrolSpeed, rb.linearVelocity.y);
     }
 
     private void FleeBehavior()
     {
+        if (!canFlee) return;
         float dir = player.position.x > transform.position.x ? -1 : 1;
         rb.linearVelocity = new Vector2(dir * chaseSpeed, rb.linearVelocity.y);
     }
@@ -350,55 +370,32 @@ public class EnemyAI : MonoBehaviour
 
     private void TryJump(float dir)
     {
-        if (!IsGrounded()) return;
-        if (Time.time - lastJumpTime < jumpCooldown) return;
+        if (!IsGrounded() || Time.time - lastJumpTime < jumpCooldown) return;
 
         lastJumpTime = Time.time;
         animator.SetTrigger("jump");
-
         rb.linearVelocity = new Vector2(dir * jumpForwardForce, jumpForce);
     }
 
     private bool IsGrounded()
     {
         if (groundCheck == null) return false;
-
-        RaycastHit2D hit = Physics2D.Raycast(
-            groundCheck.position,
-            Vector2.down,
-            groundCheckDistance,
-            groundLayer
-        );
-
+        RaycastHit2D hit = Physics2D.Raycast(groundCheck.position, Vector2.down, groundCheckDistance, groundLayer);
         return hit.collider != null;
     }
 
     private bool IsGroundAhead()
     {
         if (groundAheadCheck == null) return true;
-
-        RaycastHit2D hit = Physics2D.Raycast(
-            groundAheadCheck.position,
-            Vector2.down,
-            groundCheckDistance,
-            groundLayer
-        );
-
+        RaycastHit2D hit = Physics2D.Raycast(groundAheadCheck.position, Vector2.down, groundCheckDistance, groundLayer);
         return hit.collider != null;
     }
 
     private bool IsWallAhead()
     {
         if (wallCheck == null) return false;
-
         Vector2 dir = isFacingRight ? Vector2.right : Vector2.left;
-        RaycastHit2D hit = Physics2D.Raycast(
-            wallCheck.position,
-            dir,
-            wallCheckDistance,
-            groundLayer
-        );
-
+        RaycastHit2D hit = Physics2D.Raycast(wallCheck.position, dir, wallCheckDistance, groundLayer);
         return hit.collider != null;
     }
 
@@ -411,10 +408,8 @@ public class EnemyAI : MonoBehaviour
         if (isDead) return;
 
         health -= damage;
-
-        Debug.Log("Enemy took damage: " + damage + " | HP: " + health);
-
         animator.SetTrigger("Hit");
+        Debug.Log($"Enemy took damage: {damage} | HP: {health}");
 
         if (health <= 0)
             Die();
@@ -423,11 +418,52 @@ public class EnemyAI : MonoBehaviour
     private void Die()
     {
         isDead = true;
+        float pickupDelay = 0.5f;
+
+        // === ДРОП ВВЕРХ (180°) ===
+        foreach (var drop in drops)
+        {
+            if (drop.prefab == null) continue;
+            if (Random.value > drop.dropChance) continue;
+
+            GameObject obj = Instantiate(drop.prefab, transform.position, Quaternion.identity);
+
+            int layer = LayerMask.NameToLayer(dropLayerName);
+            if (layer >= 0 && layer <= 31)
+                obj.layer = layer;
+            else
+                Debug.LogWarning($"Drop layer '{dropLayerName}' не существует!");
+
+            Rigidbody2D rbDrop = obj.GetComponent<Rigidbody2D>();
+            Collider2D colDrop = obj.GetComponent<Collider2D>();
+
+            if (rbDrop != null)
+            {
+                float angle = Random.Range(0f, 180f) * Mathf.Deg2Rad;
+                float forceMagnitude = Random.Range(dropForce * 0.5f, dropForce);
+                Vector2 force = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * forceMagnitude;
+                rbDrop.AddForce(force, ForceMode2D.Impulse);
+            }
+
+            if (colDrop != null)
+            {
+                colDrop.enabled = false;
+                StartCoroutine(EnableColliderAfterDelay(colDrop, pickupDelay));
+            }
+        }
+
         animator.SetBool("IsDead", true);
-        rb.linearVelocity = Vector2.zero;
+        rb.velocity = Vector2.zero;
         rb.bodyType = RigidbodyType2D.Kinematic;
         GetComponent<Collider2D>().enabled = false;
+
         Destroy(gameObject, 2f);
+    }
+
+    private IEnumerator EnableColliderAfterDelay(Collider2D col, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (col != null) col.enabled = true;
     }
 
     // =====================================================
@@ -436,10 +472,8 @@ public class EnemyAI : MonoBehaviour
 
     private void FaceTarget(Vector2 target)
     {
-        if (target.x > transform.position.x && !isFacingRight)
-            Flip();
-        else if (target.x < transform.position.x && isFacingRight)
-            Flip();
+        if (target.x > transform.position.x && !isFacingRight) Flip();
+        else if (target.x < transform.position.x && isFacingRight) Flip();
     }
 
     private void Flip()

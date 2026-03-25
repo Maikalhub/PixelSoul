@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System;
 
 public class FallingPlatform : MonoBehaviour
 {
@@ -7,51 +8,58 @@ public class FallingPlatform : MonoBehaviour
     public FallMode fallMode = FallMode.Immediate;
     public enum FallMode
     {
-        Immediate,           // Падает сразу при касании
-        Delayed,             // Падает через задержку после касания
-        StepCount,           // Падает после определенного количества шагов
-        ShakeThenFall        // Сначала трясется, потом падает
+        Immediate,
+        Delayed,
+        StepCount,
+        ShakeThenFall
     }
 
     [Header("Настройки падения")]
-    public float fallDelay = 0.5f;              // Задержка перед падением
-    public float fallSpeed = 5f;                 // Скорость падения
-    public float destroyDelay = 2f;               // Задержка перед уничтожением после падения
-    public int maxSteps = 3;                       // Количество шагов до падения
+    public float fallDelay = 0.5f;
+    public float fallSpeed = 5f;
+    public float destroyDelay = 2f;
+    public int maxSteps = 3;
 
     [Header("Эффекты тряски")]
-    public bool enableShake = true;                // Включить тряску перед падением
-    public float shakeAmount = 0.1f;               // Интенсивность тряски
-    public float shakeSpeed = 10f;                  // Скорость тряски
+    public bool enableShake = true;
+    public float shakeAmount = 0.1f;
+    public float shakeSpeed = 10f;
 
     [Header("Визуальные эффекты")]
-    public GameObject fallEffect;                   // Эффект при падении
-    public GameObject disappearEffect;              // Эффект при исчезновении
-    public AudioClip shakeSound;                     // Звук тряски
-    public AudioClip fallSound;                      // Звук падения
-    public AudioClip disappearSound;                 // Звук исчезновения
-    public AudioClip reappearSound;                 // Звук исчезновения
+    public GameObject fallEffect;
+    public GameObject disappearEffect;
+    public AudioClip shakeSound;
+    public AudioClip fallSound;
+    public AudioClip disappearSound;
+    public AudioClip reappearSound;
 
     [Header("Визуальные индикаторы")]
     public SpriteRenderer spriteRenderer;
-    public Color warningColor = Color.red;          // Цвет предупреждения
-    public Color criticalColor = Color.magenta;     // Цвет критического состояния
+    public Color warningColor = Color.red;
+    public Color criticalColor = Color.magenta;
     public Animator animator;
     public string fallTrigger = "Fall";
 
     [Header("Возрождение")]
-    public bool respawnAfterFall = false;           // Возрождаться ли после падения
-    public float respawnDelay = 3f;                  // Задержка перед возрождением
-    public GameObject respawnEffect;                 // Эффект при возрождении
+    public bool respawnAfterFall = false;
+    public float respawnDelay = 3f;
+    public GameObject respawnEffect;
 
-    // Приватные переменные
+    // 💥 УРОН
+    [Header("Damage Settings")]
+    public bool dealDamageOnFall = true;
+    public int damageAmount = 1;
+    public string[] damageTags = { "Player", "Enemy", "Boss" };
+
+    [Tooltip("Trigger collider для нанесения урона")]
+    public Collider2D damageTrigger;
+
     private Rigidbody2D rb;
     private Collider2D platformCollider;
     private Vector3 startPosition;
     private bool isFalling = false;
     private int stepCount = 0;
     private bool isPlayerOnPlatform = false;
-    private Vector3 originalScale;
     private Color originalColor;
     private float shakeTimer = 0f;
 
@@ -60,29 +68,27 @@ public class FallingPlatform : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         platformCollider = GetComponent<Collider2D>();
         startPosition = transform.position;
-        originalScale = transform.localScale;
 
         if (spriteRenderer != null)
-        {
             originalColor = spriteRenderer.color;
-        }
 
-        // Если нет Rigidbody2D - добавляем
         if (rb == null)
         {
             rb = gameObject.AddComponent<Rigidbody2D>();
-            rb.bodyType = RigidbodyType2D.Kinematic; // Начинаем как кинематическая
+            rb.bodyType = RigidbodyType2D.Kinematic;
         }
 
         if (animator == null)
             animator = GetComponent<Animator>();
+
+        if (damageTrigger == null)
+            Debug.LogWarning("DamageTrigger не назначен!");
     }
 
     void Update()
     {
         if (isFalling) return;
 
-        // Эффект тряски если нужно
         if (enableShake && isPlayerOnPlatform && fallMode == FallMode.ShakeThenFall)
         {
             ShakePlatform();
@@ -110,14 +116,32 @@ public class FallingPlatform : MonoBehaviour
                     UpdatePlatformColor();
 
                     if (stepCount >= maxSteps)
-                    {
                         StartFalling();
-                    }
                     break;
 
                 case FallMode.ShakeThenFall:
                     StartCoroutine(ShakeAndFall());
                     break;
+            }
+        }
+    }
+
+    private void UpdatePlatformColor()
+    {
+        throw new NotImplementedException();
+    }
+
+    // 💥 ВОТ ГЛАВНОЕ — УРОН ЧЕРЕЗ TRIGGER
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        if (!isFalling || !dealDamageOnFall) return;
+
+        if (IsDamageTarget(other.gameObject))
+        {
+            // 👇 проверка что падаем вниз
+            if (rb.linearVelocity.y < -0.1f)
+            {
+                DealDamage(other.gameObject);
             }
         }
     }
@@ -129,7 +153,6 @@ public class FallingPlatform : MonoBehaviour
             isPlayerOnPlatform = false;
             shakeTimer = 0f;
 
-            // Возвращаем нормальную позицию после тряски
             if (fallMode == FallMode.ShakeThenFall && !isFalling)
             {
                 transform.position = startPosition;
@@ -143,22 +166,14 @@ public class FallingPlatform : MonoBehaviour
         {
             shakeTimer += Time.deltaTime;
 
-            // Эффект тряски
             float shakeX = Mathf.Sin(Time.time * shakeSpeed) * shakeAmount;
             float shakeY = Mathf.Cos(Time.time * shakeSpeed) * shakeAmount * 0.5f;
             transform.position = startPosition + new Vector3(shakeX, shakeY, 0);
 
-            // Меняем цвет в зависимости от времени тряски
             if (spriteRenderer != null)
             {
                 float t = shakeTimer / fallDelay;
                 spriteRenderer.color = Color.Lerp(originalColor, warningColor, t);
-            }
-
-            // Звук тряски
-            if (shakeSound != null && GetComponent<AudioSource>() != null && !GetComponent<AudioSource>().isPlaying)
-            {
-                GetComponent<AudioSource>().PlayOneShot(shakeSound);
             }
         }
     }
@@ -181,7 +196,6 @@ public class FallingPlatform : MonoBehaviour
 
         isFalling = true;
 
-        // Меняем физику на динамическую для падения
         if (rb != null)
         {
             rb.bodyType = RigidbodyType2D.Dynamic;
@@ -189,31 +203,9 @@ public class FallingPlatform : MonoBehaviour
             rb.linearVelocity = Vector2.down * fallSpeed;
         }
 
-        // Эффект падения
-        if (fallEffect != null)
-        {
-            Instantiate(fallEffect, transform.position, Quaternion.identity);
-        }
-
-        // Звук падения
-        if (fallSound != null && GetComponent<AudioSource>() != null)
-        {
-            GetComponent<AudioSource>().PlayOneShot(fallSound);
-        }
-
-        // Анимация
-        if (animator != null)
-        {
-            animator.SetTrigger(fallTrigger);
-        }
-
-        // Отключаем коллайдер чтобы игрок провалился
         if (platformCollider != null)
-        {
             platformCollider.enabled = false;
-        }
 
-        // Запускаем исчезновение
         StartCoroutine(DestroyAfterFall());
     }
 
@@ -221,25 +213,11 @@ public class FallingPlatform : MonoBehaviour
     {
         yield return new WaitForSeconds(destroyDelay);
 
-        // Эффект исчезновения
-        if (disappearEffect != null)
-        {
-            Instantiate(disappearEffect, transform.position, Quaternion.identity);
-        }
-
-        // Звук исчезновения
-        if (disappearSound != null && GetComponent<AudioSource>() != null)
-        {
-            GetComponent<AudioSource>().PlayOneShot(disappearSound);
-        }
-
         if (respawnAfterFall)
         {
-            // Скрываем платформу
             if (spriteRenderer != null)
                 spriteRenderer.enabled = false;
 
-            // Ждем и возрождаем
             yield return new WaitForSeconds(respawnDelay);
             RespawnPlatform();
         }
@@ -251,80 +229,50 @@ public class FallingPlatform : MonoBehaviour
 
     void RespawnPlatform()
     {
-        // Возвращаем на стартовую позицию
         transform.position = startPosition;
 
-        // Сбрасываем физику
         if (rb != null)
         {
             rb.bodyType = RigidbodyType2D.Kinematic;
             rb.linearVelocity = Vector2.zero;
         }
 
-        // Включаем коллайдер
         if (platformCollider != null)
-        {
             platformCollider.enabled = true;
-        }
 
-        // Показываем спрайт
         if (spriteRenderer != null)
         {
             spriteRenderer.enabled = true;
             spriteRenderer.color = originalColor;
         }
 
-        // Сбрасываем переменные
         isFalling = false;
         stepCount = 0;
         shakeTimer = 0f;
-
-        // Эффект возрождения
-        if (respawnEffect != null)
-        {
-            Instantiate(respawnEffect, transform.position, Quaternion.identity);
-        }
-
-        // Звук возрождения (опционально)
-        if (reappearSound != null && GetComponent<AudioSource>() != null)
-        {
-            GetComponent<AudioSource>().PlayOneShot(reappearSound);
-        }
     }
 
-    void UpdatePlatformColor()
+    bool IsDamageTarget(GameObject obj)
     {
-        if (spriteRenderer != null)
+        foreach (string tag in damageTags)
         {
-            float progress = (float)stepCount / maxSteps;
-
-            if (progress >= 0.7f)
-            {
-                spriteRenderer.color = criticalColor;
-            }
-            else if (progress >= 0.3f)
-            {
-                spriteRenderer.color = warningColor;
-            }
+            if (obj.CompareTag(tag))
+                return true;
         }
+        return false;
     }
 
-    // Публичный метод для принудительного сброса
-    public void ResetPlatform()
+    void DealDamage(GameObject target)
     {
-        StopAllCoroutines();
-        RespawnPlatform();
-    }
+        var health = target.GetComponent<PlayerMovement>();
+        if (health != null)
+            health.TakeDamage(damageAmount);
 
-    // Для визуализации в редакторе
-    private void OnDrawGizmosSelected()
-    {
-        // Рисуем путь падения
-        Gizmos.color = Color.red;
-        Gizmos.DrawLine(transform.position, transform.position + Vector3.down * 5f);
+        var enemyHealth = target.GetComponent<EnemyAI>();
+        if (enemyHealth != null)
+            enemyHealth.TakeDamageMethod(damageAmount);
 
-        // Отмечаем зону уничтожения
-        Gizmos.color = new Color(1f, 0f, 0f, 0.3f);
-        Gizmos.DrawCube(transform.position + Vector3.down * destroyDelay * fallSpeed, new Vector3(2f, 0.5f, 0f));
+        var bossHealth = target.GetComponent<BossAI>();
+        if (bossHealth != null)
+            bossHealth.TakeDamage(damageAmount);
     }
 }
