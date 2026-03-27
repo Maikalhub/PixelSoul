@@ -1,13 +1,14 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class MenuManager : MonoBehaviour
 {
     private enum MenuState { ScreenMenu, MainMenu }
     private MenuState currentState;
 
-    [Header("📌 INFO")]
+    [Header("INFO")]
     [TextArea(3, 6)]
     [SerializeField]
     private string info =
@@ -28,7 +29,7 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private GameObject settingsMenu;
 
     [Header("SETTINGS MENU TABS")]
-    [SerializeField] private GameObject[] settingsTabs; // 4 объекта
+    [SerializeField] private GameObject[] settingsTabs;
     [SerializeField] private int defaultSettingsTab = 0;
 
     [Header("UI")]
@@ -42,7 +43,7 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private float musicFadeDuration = 1f;
 
     [Header("Fade / Transition")]
-    [SerializeField] private SpriteRenderer backgroundFade;
+    [SerializeField] private Image backgroundFade;
     [SerializeField] private float fadeDuration = 0.5f;
 
     [Header("Idle Return")]
@@ -52,8 +53,8 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private string sceneToLoad;
 
     [Header("EXIT SETTINGS")]
-    [SerializeField] private GameObject exitTextObject; // текст "Выход..."
-    [SerializeField] private float exitFadeDuration = 1f; // длительность затемнения перед выходом
+    [SerializeField] private GameObject exitTextObject;
+    [SerializeField] private float exitFadeDuration = 1f;
 
     private float idleTimer;
     private bool isTransitioning;
@@ -68,6 +69,7 @@ public class MenuManager : MonoBehaviour
         if (backgroundFade != null)
         {
             backgroundFade.gameObject.SetActive(true);
+            backgroundFade.raycastTarget = false;
             SetFadeAlpha(0f);
         }
 
@@ -83,6 +85,7 @@ public class MenuManager : MonoBehaviour
         {
             if (Input.anyKeyDown || Input.GetMouseButtonDown(0))
                 OpenMainMenu(null);
+
             return;
         }
 
@@ -98,13 +101,16 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    private void ResetIdleTimer() => idleTimer = 0f;
+    private void ResetIdleTimer()
+    {
+        idleTimer = 0f;
+    }
 
     // ================= SCREEN MENU =================
     private void ShowScreenMenuImmediate()
     {
-        screenMenu.SetActive(true);
-        mainMenu.SetActive(false);
+        if (screenMenu != null) screenMenu.SetActive(true);
+        if (mainMenu != null) mainMenu.SetActive(false);
 
         screenMenuBlinkText?.ResetBlink();
         ResetIdleTimer();
@@ -124,14 +130,14 @@ public class MenuManager : MonoBehaviour
         isTransitioning = true;
 
         PlayTransitionSound();
-        yield return StartCoroutine(FadeSprite(0f, 1f));
+        yield return StartCoroutine(FadeImage(0f, 1f));
 
-        mainMenu.SetActive(false);
-        screenMenu.SetActive(true);
+        if (mainMenu != null) mainMenu.SetActive(false);
+        if (screenMenu != null) screenMenu.SetActive(true);
 
         screenMenuBlinkText?.ResetBlink();
 
-        yield return StartCoroutine(FadeSprite(1f, 0f));
+        yield return StartCoroutine(FadeImage(1f, 0f));
 
         currentState = MenuState.ScreenMenu;
         ResetIdleTimer();
@@ -155,14 +161,14 @@ public class MenuManager : MonoBehaviour
     private IEnumerator OpenMainMenuRoutine()
     {
         PlayTransitionSound();
-        yield return StartCoroutine(FadeSprite(0f, 1f));
+        yield return StartCoroutine(FadeImage(0f, 1f));
 
-        screenMenu.SetActive(false);
-        mainMenu.SetActive(true);
+        if (screenMenu != null) screenMenu.SetActive(false);
+        if (mainMenu != null) mainMenu.SetActive(true);
 
         ShowStartMenu(null);
 
-        yield return StartCoroutine(FadeSprite(1f, 0f));
+        yield return StartCoroutine(FadeImage(1f, 0f));
 
         ResetIdleTimer();
         isTransitioning = false;
@@ -174,7 +180,7 @@ public class MenuManager : MonoBehaviour
         PlayClickSound(clickSound);
         ResetIdleTimer();
         DisableAllSubMenus();
-        startMenu.SetActive(true);
+        if (startMenu != null) startMenu.SetActive(true);
     }
 
     public void ShowNewGameMenu(AudioClip clickSound)
@@ -182,7 +188,7 @@ public class MenuManager : MonoBehaviour
         PlayClickSound(clickSound);
         ResetIdleTimer();
         DisableAllSubMenus();
-        newgameMenu.SetActive(true);
+        if (newgameMenu != null) newgameMenu.SetActive(true);
     }
 
     public void ShowLoadMenu(AudioClip clickSound)
@@ -190,7 +196,7 @@ public class MenuManager : MonoBehaviour
         PlayClickSound(clickSound);
         ResetIdleTimer();
         DisableAllSubMenus();
-        loadMenu.SetActive(true);
+        if (loadMenu != null) loadMenu.SetActive(true);
     }
 
     public void ShowLevelMenu(AudioClip clickSound)
@@ -198,7 +204,7 @@ public class MenuManager : MonoBehaviour
         PlayClickSound(clickSound);
         ResetIdleTimer();
         DisableAllSubMenus();
-        levelMenu.SetActive(true);
+        if (levelMenu != null) levelMenu.SetActive(true);
     }
 
     public void ShowSettingsMenu(AudioClip clickSound)
@@ -207,17 +213,19 @@ public class MenuManager : MonoBehaviour
         ResetIdleTimer();
         DisableAllSubMenus();
 
-        settingsMenu.SetActive(true);
+        if (settingsMenu != null)
+            settingsMenu.SetActive(true);
+
         ShowSettingsTabInternal(defaultSettingsTab);
     }
 
     private void DisableAllSubMenus()
     {
-        startMenu.SetActive(false);
-        newgameMenu.SetActive(false);
-        loadMenu.SetActive(false);
-        levelMenu.SetActive(false);
-        settingsMenu.SetActive(false);
+        if (startMenu != null) startMenu.SetActive(false);
+        if (newgameMenu != null) newgameMenu.SetActive(false);
+        if (loadMenu != null) loadMenu.SetActive(false);
+        if (levelMenu != null) levelMenu.SetActive(false);
+        if (settingsMenu != null) settingsMenu.SetActive(false);
     }
 
     // ================= SETTINGS TABS =================
@@ -227,7 +235,10 @@ public class MenuManager : MonoBehaviour
         if (index < 0 || index >= settingsTabs.Length) return;
 
         for (int i = 0; i < settingsTabs.Length; i++)
-            settingsTabs[i].SetActive(i == index);
+        {
+            if (settingsTabs[i] != null)
+                settingsTabs[i].SetActive(i == index);
+        }
     }
 
     public void SettingsTab1(AudioClip clickSound)
@@ -261,16 +272,20 @@ public class MenuManager : MonoBehaviour
     // ================= EXIT BUTTON =================
     public void ExitGame(AudioClip clickSound)
     {
+        if (isTransitioning) return;
+
         PlayClickSound(clickSound);
         ResetIdleTimer();
 
         if (exitTextObject != null)
         {
             exitTextObject.SetActive(true);
+
             CanvasGroup cg = exitTextObject.GetComponent<CanvasGroup>();
             if (cg == null)
                 cg = exitTextObject.AddComponent<CanvasGroup>();
-            cg.alpha = 0f; // изначально прозрачный
+
+            cg.alpha = 0f;
         }
 
         StartCoroutine(ExitGameRoutine());
@@ -278,12 +293,15 @@ public class MenuManager : MonoBehaviour
 
     private IEnumerator ExitGameRoutine()
     {
-        // 1️⃣ Начинаем затемнение экрана
+        isTransitioning = true;
+
+        // 1. Затемнение экрана
         if (backgroundFade != null)
         {
             float fadeStart = backgroundFade.color.a;
             float fadeEnd = 1f;
             float t = 0f;
+
             while (t < exitFadeDuration)
             {
                 t += Time.deltaTime;
@@ -292,27 +310,30 @@ public class MenuManager : MonoBehaviour
                 backgroundFade.color = c;
                 yield return null;
             }
+
             Color final = backgroundFade.color;
             final.a = fadeEnd;
             backgroundFade.color = final;
         }
 
-        // 2️⃣ Плавное проявление текста
+        // 2. Проявление текста
         if (exitTextObject != null)
         {
             CanvasGroup cg = exitTextObject.GetComponent<CanvasGroup>();
-            float textFadeDuration = 0.5f; // время проявления текста
+            float textFadeDuration = 0.5f;
             float t = 0f;
+
             while (t < textFadeDuration)
             {
                 t += Time.deltaTime;
                 cg.alpha = Mathf.Lerp(0f, 1f, t / textFadeDuration);
                 yield return null;
             }
+
             cg.alpha = 1f;
         }
 
-        // 3️⃣ Ждём немного, чтобы пользователь увидел текст
+        // 3. Пауза перед выходом
         yield return new WaitForSeconds(0.5f);
 
 #if UNITY_EDITOR
@@ -337,7 +358,8 @@ public class MenuManager : MonoBehaviour
 
     private void PlayBackgroundMusic(int index)
     {
-        if (musicAudioSource == null || backgroundMusic.Length == 0) return;
+        if (musicAudioSource == null || backgroundMusic == null || backgroundMusic.Length == 0) return;
+        if (index < 0 || index >= backgroundMusic.Length) return;
 
         musicAudioSource.clip = backgroundMusic[index];
         musicAudioSource.loop = true;
@@ -350,8 +372,11 @@ public class MenuManager : MonoBehaviour
         if (musicAudioSource == null) yield break;
 
         float startVol = musicAudioSource.volume;
-        for (float t = 0f; t < musicFadeDuration; t += Time.deltaTime)
+        float t = 0f;
+
+        while (t < musicFadeDuration)
         {
+            t += Time.deltaTime;
             musicAudioSource.volume = Mathf.Lerp(startVol, 0f, t / musicFadeDuration);
             yield return null;
         }
@@ -361,8 +386,10 @@ public class MenuManager : MonoBehaviour
     }
 
     // ================= FADE =================
-    private IEnumerator FadeSprite(float from, float to)
+    private IEnumerator FadeImage(float from, float to)
     {
+        if (backgroundFade == null) yield break;
+
         float t = 0f;
         Color c = backgroundFade.color;
 
@@ -380,6 +407,8 @@ public class MenuManager : MonoBehaviour
 
     private void SetFadeAlpha(float a)
     {
+        if (backgroundFade == null) return;
+
         Color c = backgroundFade.color;
         c.a = a;
         backgroundFade.color = c;
@@ -399,28 +428,21 @@ public class MenuManager : MonoBehaviour
         PlayClickSound(clickSound);
         PlayTransitionSound();
 
-        yield return StartCoroutine(FadeSprite(0f, 1f));
+        yield return StartCoroutine(FadeImage(0f, 1f));
         yield return StartCoroutine(FadeOutMusic());
 
         SceneManager.LoadScene(sceneToLoad);
     }
 
-
-
     // ================= QUIT =================
     public void QuitGame(AudioClip clickSound)
     {
         PlayClickSound(clickSound);
+
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
         Application.Quit();
 #endif
     }
-
-
-
 }
-
-
-

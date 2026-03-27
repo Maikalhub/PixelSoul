@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Cinemachine;
@@ -8,30 +7,32 @@ using UnityEngine.SceneManagement;
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Projectile Settings")]
-    public GameObject bulletPrefab;   // префаб пули
-    public Transform firePoint;       // точка, откуда бросаем
+    public GameObject bulletPrefab;
+    public Transform firePoint;
     public float throwForce = 15f;
     public float cooldown = 0.5f;
+
     [Header("Collision Settings")]
-    public LayerMask destroyLayers;   // слои, при столкновении с которыми пуля умирает
+    public LayerMask destroyLayers;
     private bool canThrow = true;
-    //
+
     [Header("References")]
     public Rigidbody2D rb;
     public Animator animator;
-    bool isFacingRight = true;
-    bool wasGrounded;
     public ParticleSystem smokeFX;
-    public Collider2D playerCollider; // Добавьте эту ссылку
-    //
+    public Collider2D playerCollider;
+
+    private bool isFacingRight = true;
+    private bool wasGrounded;
+
     [Header("Gravity")]
     public float baseGravity = 2f;
     public float maxFallSpeed = 18f;
     public float fallGravityMult = 2f;
-    //
+
     [Header("Movement")]
     public float moveSpeed = 5f;
-    float horizontalMovement;
+    private float horizontalMovement;
 
     [Header("Acceleration")]
     public float acceleration = 15f;
@@ -41,69 +42,69 @@ public class PlayerMovement : MonoBehaviour
     public float sprintMultiplier = 1.8f;
     private bool isSprinting;
 
-    //
     [Header("Dashing")]
     public float dashSpeed = 25f;
-    float dashDuration = 0.2f;
+    public float dashDuration = 0.2f;
     public float dashCooldown = 0.5f;
-    bool isDashing;
-    bool canDash = true;
-    TrailRenderer trailRenderer;
-    //
+    private bool isDashing;
+    private bool canDash = true;     // отвечает только за кулдаун
+    private bool hasAirDash = true;  // отвечает только за воздушный дэш
+    private TrailRenderer trailRenderer;
+
     [Header("Jumping")]
     public float jumpPower = 10f;
     public int maxJumps = 2;
     private int jumpsRemaining;
-    //
+
     [Header("Ground Check")]
     public Transform groundCheckPos;
     public Vector2 groundCheckSize = new Vector2(0.49f, 0.03f);
     public LayerMask groundLayer;
-    bool isGrounded;
-    //
+    private bool isGrounded;
+
     [Header("Wall Check")]
     public Transform wallCheckPos;
     public Vector2 wallCheckSize = new Vector2(0.49f, 0.03f);
     public LayerMask wallLayer;
-    //
+
     [Header("Wall Movement")]
     public float wallSlideSpeed = 2f;
-    bool isWallSliding;
-    //
+    private bool isWallSliding;
+
     [Header("Wall Jump")]
-    bool isWallJumping;
-    float wallJumpDirection;
+    private bool isWallJumping;
+    private float wallJumpDirection;
     public float wallJumpTime = 0.2f;
-    float wallJumpTimer;
+    private float wallJumpTimer;
     public Vector2 wallJumpPower = new Vector2(5f, 10f);
-    //
+
     [Header("Platform Drop")]
-    public float dropSpeed = 8f; // Скорость спуска
-    public float dropDisableTime = 0.3f; // Время игнорирования платформы
-    bool isDroppingFromPlatform = false;
-    //
+    public float dropSpeed = 8f;
+    public float dropDisableTime = 0.3f;
+    private bool isDroppingFromPlatform = false;
+
     public CinemachineImpulseSource impulseSource;
-    //
+
     [Header("Ripple Effect")]
     public RippleEffect rippleEffect;
-    public float rippleStrength = 1.0f; // Сила эффекта ripple при рывке
-    //
+    public float rippleStrength = 1.0f;
+
     [Header("Ripple Material")]
     public Material rippleMaterial;
-    //
+
     [Header("Ghost Trail")]
     [SerializeField] private GhostTrail ghostTrail;
-    //
+
     [Header("Attack Check")]
     public int attackDamage = 10;
-    //
+
     [Header("Combat")]
     public float comboWindow = 0.45f;
     public float attack1Lock = 0.45f;
     public float attack2Lock = 0.55f;
-    int comboStep;
-    float comboTimer;
-    bool isAttacking;
+    private int comboStep;
+    private float comboTimer;
+    private bool isAttacking;
 
     [Header("Health")]
     public int maxHealth = 100;
@@ -111,46 +112,55 @@ public class PlayerMovement : MonoBehaviour
     public bool isDead;
 
     [Header("Stamina")]
-    public float maxStamina = 100;
+    public float maxStamina = 100f;
     public float currentStamina;
-    public float staminaRegenRate = 15f; // Скорость восстановления стамины в секунду
-    public float staminaRegenDelay = 1f; // Задержка перед восстановлением
-    private float staminaRegenTimer; // Таймер для задержки восстановления
+    public float staminaRegenRate = 15f;
+    public float staminaRegenDelay = 1f;
+    private float staminaRegenTimer;
 
     [Header("Stamina Costs")]
-    public int dashStaminaCost = 20;
-    public int jumpStaminaCost = 10;
-    public int wallJumpStaminaCost = 15;
-    public int attackStaminaCost = 15;
-    public int throwStaminaCost = 25;
-    public int sprintStaminaCost = 5; // Стоимость спринта в секунду (если будет спринт)
+    public float dashStaminaCost = 20f;
+    public float jumpStaminaCost = 10f;
+    public float wallJumpStaminaCost = 15f;
+    public float attackStaminaCost = 15f;
+    public float throwStaminaCost = 25f;
+    public float sprintStaminaCost = 5f; // в секунду
 
-    // === ДОБАВЛЕНО В Jumping ===
     [Header("Jump Buffer")]
     public float jumpBufferTime = 0.15f;
     private float jumpBufferCounter;
 
     [Header("Death UI")]
-    public CanvasGroup deathPanel;   // Панель с Image на весь экран
-    public float fadeDuration = 1f;  // Длительность затемнения
-    public GameObject deathText;     // Надпись "Смерть"
+    public CanvasGroup deathPanel;
+    public float fadeDuration = 1f;
+    public GameObject deathText;
     public GameObject restartButton;
     public GameObject mainMenuButton;
 
+    [Header("Damage Feedback")]
+    public float hitKnockbackX = 3f;
+    public float hitKnockbackY = 5f;
+    public float damageInvulnerabilityTime = 0.25f;
+
+    private Coroutine attackCoroutine;
+    private Coroutine dashCoroutine;
+    private Coroutine dashCooldownCoroutine;
+    private bool isInvulnerable;
 
     private void Start()
     {
         TriggerRipple();
 
         currentHealth = maxHealth;
-        currentStamina = maxStamina; // Инициализация стамины
+        currentStamina = maxStamina;
+        jumpsRemaining = maxJumps;
+
         trailRenderer = GetComponent<TrailRenderer>();
         if (trailRenderer == null)
         {
             Debug.LogError("TrailRenderer не найден на объекте!");
         }
 
-        // Если не назначен коллайдер в инспекторе, пытаемся найти его
         if (playerCollider == null)
         {
             playerCollider = GetComponent<Collider2D>();
@@ -158,8 +168,6 @@ public class PlayerMovement : MonoBehaviour
 
         impulseSource = GetComponent<CinemachineImpulseSource>();
 
-
-        // Скрываем панель и кнопки
         if (deathPanel != null)
         {
             deathPanel.alpha = 0f;
@@ -170,20 +178,18 @@ public class PlayerMovement : MonoBehaviour
         if (deathText != null) deathText.SetActive(false);
         if (restartButton != null) restartButton.SetActive(false);
         if (mainMenuButton != null) mainMenuButton.SetActive(false);
-
     }
-    void Update()
+
+    private void Update()
     {
-        animator.SetFloat("yVelocity", rb.velocity.y);
-        animator.SetFloat("magnitude", rb.velocity.magnitude);
+        animator.SetFloat("yVelocity", rb.linearVelocity.y);
+        animator.SetFloat("magnitude", rb.linearVelocity.magnitude);
         animator.SetBool("isWallSliding", isWallSliding);
 
-        // jump buffer
-        if (jumpBufferCounter > 0)
+        if (jumpBufferCounter > 0f)
             jumpBufferCounter -= Time.deltaTime;
 
-        // combo timer
-        if (comboTimer > 0)
+        if (comboTimer > 0f)
             comboTimer -= Time.deltaTime;
         else
             comboStep = 0;
@@ -191,16 +197,17 @@ public class PlayerMovement : MonoBehaviour
         if (isDead)
             return;
 
-        HandleStaminaRegeneration();
-
         GroundCheck();
+        HandleSprintStamina();
+        HandleStaminaRegeneration();
         HandleJumpBuffer();
     }
+
     private void FixedUpdate()
     {
-        if (isDead || isDashing) return;
+        if (isDead || isDashing)
+            return;
 
-        // --- движение по горизонтали ---
         if (!isWallJumping)
         {
             float targetSpeed = horizontalMovement * moveSpeed;
@@ -208,53 +215,182 @@ public class PlayerMovement : MonoBehaviour
             if (isSprinting)
                 targetSpeed *= sprintMultiplier;
 
-            // плавное ускорение/замедление
-            float speedDiff = targetSpeed - rb.velocity.x;
+            float speedDiff = targetSpeed - rb.linearVelocity.x;
             float accelRate = Mathf.Abs(targetSpeed) > 0.01f ? acceleration : deceleration;
 
-            rb.velocity = new Vector2(rb.velocity.x + speedDiff * accelRate * Time.fixedDeltaTime, rb.velocity.y);
+            rb.linearVelocity = new Vector2(
+                rb.linearVelocity.x + speedDiff * accelRate * Time.fixedDeltaTime,
+                rb.linearVelocity.y
+            );
 
-            // поворот персонажа
-            if (horizontalMovement != 0)
+            if (horizontalMovement != 0f)
                 Flip();
         }
 
-        // --- физика и гравитация ---
         ProcessGravity();
         ProcessWallSlide();
         ProcessWallJump();
     }
 
-    // Метод для восстановления стамины
     private void HandleStaminaRegeneration()
     {
-        // Если таймер восстановления активен
-        if (staminaRegenTimer > 0)
+        if (staminaRegenTimer > 0f)
         {
             staminaRegenTimer -= Time.deltaTime;
         }
-        // Восстанавливаем стамину только если таймер <= 0 и стамина не полная
         else if (currentStamina < maxStamina)
         {
-            currentStamina += Mathf.RoundToInt(staminaRegenRate * Time.deltaTime);
+            currentStamina += staminaRegenRate * Time.deltaTime;
             currentStamina = Mathf.Min(currentStamina, maxStamina);
         }
     }
 
-    // Метод для проверки и траты стамины
-    private bool TrySpendStamina(int cost)
+    private void HandleSprintStamina()
+    {
+        if (!isSprinting || isDashing)
+            return;
+
+        if (Mathf.Abs(horizontalMovement) < 0.01f)
+            return;
+
+        if (currentStamina <= 0f)
+        {
+            currentStamina = 0f;
+            isSprinting = false;
+            return;
+        }
+
+        currentStamina -= sprintStaminaCost * Time.deltaTime;
+        currentStamina = Mathf.Max(currentStamina, 0f);
+        staminaRegenTimer = staminaRegenDelay;
+
+        if (currentStamina <= 0f)
+        {
+            currentStamina = 0f;
+            isSprinting = false;
+        }
+    }
+
+    private bool TrySpendStamina(float cost)
     {
         if (currentStamina >= cost)
         {
             currentStamina -= cost;
-            // Сбрасываем таймер восстановления при трате стамины
             staminaRegenTimer = staminaRegenDelay;
             return true;
         }
+
         return false;
     }
 
-    // Метод для спуска с платформы
+    public void Move(InputAction.CallbackContext context)
+    {
+        horizontalMovement = context.ReadValue<Vector2>().x;
+    }
+
+    public void Sprint(InputAction.CallbackContext context)
+    {
+        if (context.performed)
+            isSprinting = true;
+
+        if (context.canceled)
+            isSprinting = false;
+    }
+
+    public void Jump(InputAction.CallbackContext context)
+    {
+        if (context.performed)
+        {
+            jumpBufferCounter = jumpBufferTime;
+        }
+
+        if (context.canceled && rb.linearVelocity.y > 0f)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
+        }
+    }
+
+    public void Dash(InputAction.CallbackContext context)
+    {
+        Debug.Log($"Dash input: {context.performed}, CanDash: {canDash}, HasAirDash: {hasAirDash}, IsDashing: {isDashing}");
+
+        if (!context.performed || !canDash || isDashing || isDead)
+            return;
+
+        if (!isGrounded && !hasAirDash)
+            return;
+
+        if (!TrySpendStamina(dashStaminaCost))
+        {
+            Debug.Log("Недостаточно стамины для рывка!");
+            return;
+        }
+
+        if (!isGrounded)
+            hasAirDash = false;
+
+        if (CameraShakeManager.Instance != null && impulseSource != null)
+            CameraShakeManager.Instance.Shake(impulseSource);
+
+        if (rippleEffect != null)
+        {
+            TriggerRipple();
+            rippleEffect.Emit(new Vector2(0.5f, 0.5f));
+            StartCoroutine(AdjustRippleForDash());
+        }
+
+        if (dashCoroutine != null)
+            StopCoroutine(dashCoroutine);
+
+        dashCoroutine = StartCoroutine(DashCoroutine());
+    }
+
+    public void Attack(InputAction.CallbackContext context)
+    {
+        if (!context.performed) return;
+        if (isDead || isDashing || isWallJumping) return;
+        if (isAttacking && comboTimer <= 0f) return;
+
+        if (!TrySpendStamina(attackStaminaCost))
+        {
+            Debug.Log("Недостаточно стамины для атаки!");
+            return;
+        }
+
+        comboTimer = comboWindow;
+        comboStep = Mathf.Clamp(comboStep + 1, 1, 2);
+
+        string trigger = comboStep == 1 ? "Attack1" : "Attack2";
+        float lockTime = comboStep == 1 ? attack1Lock : attack2Lock;
+
+        if (comboStep == 2)
+            comboStep = 0;
+
+        if (attackCoroutine != null)
+        {
+            StopCoroutine(attackCoroutine);
+            attackCoroutine = null;
+        }
+
+        attackCoroutine = StartCoroutine(AttackRoutine(trigger, lockTime));
+        Debug.Log("Атака выполнена");
+    }
+
+    public void Throw(InputAction.CallbackContext context)
+    {
+        if (context.performed && !isDead)
+        {
+            if (!TrySpendStamina(throwStaminaCost))
+            {
+                Debug.Log("Недостаточно стамины для броска!");
+                return;
+            }
+
+            animator.SetTrigger("Throw");
+            Throw();
+        }
+    }
+
     public void DropFromPlatform(InputAction.CallbackContext context)
     {
         if (context.performed && isGrounded && !isDashing && !isWallJumping)
@@ -269,17 +405,15 @@ public class PlayerMovement : MonoBehaviour
 
         isDroppingFromPlatform = true;
 
-        // Ищем платформы под ногами
         Collider2D[] platforms = Physics2D.OverlapBoxAll(
             groundCheckPos.position,
             groundCheckSize,
-            0,
-            LayerMask.GetMask("Platform") // Убедитесь, что слой правильный
+            0f,
+            LayerMask.GetMask("Platform")
         );
 
         if (platforms.Length > 0 && playerCollider != null)
         {
-            // Временно отключаем столкновение со всеми найденными платформами
             foreach (Collider2D platform in platforms)
             {
                 if (platform != null && platform.GetComponent<PlatformEffector2D>() != null)
@@ -288,13 +422,10 @@ public class PlayerMovement : MonoBehaviour
                 }
             }
 
-            // Применяем скорость вниз для спуска
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, -dropSpeed);
 
-            // Ждём
             yield return new WaitForSeconds(dropDisableTime);
 
-            // Восстанавливаем столкновение
             foreach (Collider2D platform in platforms)
             {
                 if (platform != null && platform.GetComponent<PlatformEffector2D>() != null)
@@ -307,127 +438,20 @@ public class PlayerMovement : MonoBehaviour
         isDroppingFromPlatform = false;
     }
 
-    public void Move(InputAction.CallbackContext context)
-    {
-        horizontalMovement = context.ReadValue<Vector2>().x;
-    }
-
-    public void Attack(InputAction.CallbackContext context)
-    {
-        if (!context.performed) return;
-        if (isAttacking && comboTimer <= 0) return;
-
-        // Проверяем наличие стамины для атаки
-        if (!TrySpendStamina(attackStaminaCost))
-        {
-            Debug.Log("Недостаточно стамины для атаки!");
-            return;
-        }
-
-        comboTimer = comboWindow;
-        comboStep++;
-
-        if (comboStep == 1)
-            StartCoroutine(AttackRoutine("Attack1", attack1Lock));
-        else if (comboStep == 2)
-        {
-            StartCoroutine(AttackRoutine("Attack2", attack2Lock));
-            comboStep = 0;
-        }
-
-        Debug.Log("Атака выполнена");
-    }
-
-    public void Dash(InputAction.CallbackContext context)
-    {
-        Debug.Log($"Dash input: {context.performed}, CanDash: {canDash}, IsDashing: {isDashing}");
-
-        // Проверяем наличие стамины для рывка
-        if (context.performed && canDash && !isDashing)
-        {
-            if (!TrySpendStamina(dashStaminaCost))
-            {
-                Debug.Log("Недостаточно стамины для рывка!");
-                return;
-            }
-
-            CameraShakeManager.Instance.Shake(impulseSource);
-
-            // Добавляем эффект ripple при рывке
-            if (rippleEffect != null)
-            {
-                TriggerRipple();
-
-                // Вычисляем позицию для ripple (центр экрана или позиция игрока на экране)
-                rippleEffect.Emit(new Vector2(0.5f, 0.5f));
-
-                // Можно регулировать параметры ripple для рывка
-                StartCoroutine(AdjustRippleForDash());
-            }
-
-            StartCoroutine(DashCoroutine());
-        }
-    }
-
-
-    public void Sprint(InputAction.CallbackContext context)
-    {
-        if (context.performed)
-            isSprinting = true;
-
-        if (context.canceled)
-            isSprinting = false;
-    }
-
-    public void Throw(InputAction.CallbackContext context)
-    {
-        if (context.performed && !isDead)
-        {
-            // Проверяем наличие стамины для броска
-            if (!TrySpendStamina(throwStaminaCost))
-            {
-                Debug.Log("Недостаточно стамины для броска!");
-                return;
-            }
-
-            animator.SetTrigger("Throw"); // через Any State
-            Throw();
-        }
-    }
-
-    IEnumerator AttackRoutine(string trigger, float lockTime)
+    private IEnumerator AttackRoutine(string trigger, float lockTime)
     {
         isAttacking = true;
+
+        animator.ResetTrigger("Attack1");
+        animator.ResetTrigger("Attack2");
         animator.SetTrigger(trigger);
 
-        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
 
         yield return new WaitForSeconds(lockTime);
 
         isAttacking = false;
-    }
-
-    private IEnumerator AdjustRippleForDash()
-    {
-        if (rippleEffect == null) yield break;
-
-        // Сохраняем оригинальные значения
-        float originalRefraction = rippleEffect.refractionStrength;
-        float originalReflection = rippleEffect.reflectionStrength;
-        float originalWaveSpeed = rippleEffect.waveSpeed;
-
-        // Увеличиваем эффект для рывка
-        rippleEffect.refractionStrength = Mathf.Min(originalRefraction * 1.5f, 1.0f);
-        rippleEffect.reflectionStrength = Mathf.Min(originalReflection * 1.3f, 1.0f);
-        rippleEffect.waveSpeed = originalWaveSpeed * 0.8f; // Немного замедляем волны
-
-        // Ждем короткое время
-        yield return new WaitForSeconds(0.3f);
-
-        // Возвращаем оригинальные значения
-        rippleEffect.refractionStrength = originalRefraction;
-        rippleEffect.reflectionStrength = originalReflection;
-        rippleEffect.waveSpeed = originalWaveSpeed;
+        attackCoroutine = null;
     }
 
     private IEnumerator DashCoroutine()
@@ -442,29 +466,17 @@ public class PlayerMovement : MonoBehaviour
         isDashing = true;
 
         if (trailRenderer != null)
-        {
             trailRenderer.emitting = true;
-        }
 
-        float dashDirection;
-        if (Mathf.Abs(horizontalMovement) > 0.1f)
-        {
-            dashDirection = Mathf.Sign(horizontalMovement);
-        }
-        else
-        {
-            dashDirection = isFacingRight ? 1f : -1f;
-        }
+        float dashDirection = Mathf.Abs(horizontalMovement) > 0.1f
+            ? Mathf.Sign(horizontalMovement)
+            : (isFacingRight ? 1f : -1f);
 
         float originalGravity = rb.gravityScale;
-        rb.gravityScale = 0f;
-
         float originalYVelocity = rb.linearVelocity.y;
 
-        rb.linearVelocity = new Vector2(
-            dashDirection * dashSpeed,
-            originalYVelocity
-        );
+        rb.gravityScale = 0f;
+        rb.linearVelocity = new Vector2(dashDirection * dashSpeed, originalYVelocity);
 
         yield return new WaitForSeconds(dashDuration);
 
@@ -472,61 +484,60 @@ public class PlayerMovement : MonoBehaviour
 
         if (Mathf.Abs(horizontalMovement) > 0.1f)
         {
-            rb.linearVelocity = new Vector2(
-                horizontalMovement * moveSpeed,
-                rb.linearVelocity.y
-            );
+            rb.linearVelocity = new Vector2(horizontalMovement * moveSpeed, rb.linearVelocity.y);
         }
         else
         {
-            rb.linearVelocity = new Vector2(
-                0f,
-                rb.linearVelocity.y
-            );
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
         }
 
         if (trailRenderer != null)
-        {
             trailRenderer.emitting = false;
-        }
 
         isDashing = false;
+        dashCoroutine = null;
+
         Debug.Log("DASH ENDED!");
 
+        if (dashCooldownCoroutine != null)
+            StopCoroutine(dashCooldownCoroutine);
+
+        dashCooldownCoroutine = StartCoroutine(DashCooldownRoutine());
+    }
+
+    private IEnumerator DashCooldownRoutine()
+    {
         yield return new WaitForSeconds(dashCooldown);
         canDash = true;
+        dashCooldownCoroutine = null;
         Debug.Log("DASH READY AGAIN!");
     }
 
-    public void Jump(InputAction.CallbackContext context)
+    private IEnumerator AdjustRippleForDash()
     {
-        if (context.performed)
-        {
-            jumpBufferCounter = jumpBufferTime;
-        }
+        if (rippleEffect == null) yield break;
 
-        if (context.canceled && rb.linearVelocity.y > 0)
-        {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
-        }
+        float originalRefraction = rippleEffect.refractionStrength;
+        float originalReflection = rippleEffect.reflectionStrength;
+        float originalWaveSpeed = rippleEffect.waveSpeed;
+
+        rippleEffect.refractionStrength = Mathf.Min(originalRefraction * 1.5f, 1.0f);
+        rippleEffect.reflectionStrength = Mathf.Min(originalReflection * 1.3f, 1.0f);
+        rippleEffect.waveSpeed = originalWaveSpeed * 0.8f;
+
+        yield return new WaitForSeconds(0.3f);
+
+        rippleEffect.refractionStrength = originalRefraction;
+        rippleEffect.reflectionStrength = originalReflection;
+        rippleEffect.waveSpeed = originalWaveSpeed;
     }
-
-    private void JumpFX()
-    {
-        animator.SetTrigger("jump");
-        if (smokeFX != null)
-        {
-            smokeFX.Play();
-        }
-    }
-
 
     private void HandleJumpBuffer()
     {
         if (isDashing || isAttacking) return;
 
         // WALL JUMP
-        if (jumpBufferCounter > 0 && wallJumpTimer > 0f)
+        if (jumpBufferCounter > 0f && wallJumpTimer > 0f)
         {
             if (!TrySpendStamina(wallJumpStaminaCost))
                 return;
@@ -547,7 +558,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // NORMAL / DOUBLE JUMP
-        if (jumpBufferCounter > 0 && jumpsRemaining > 0)
+        if (jumpBufferCounter > 0f && jumpsRemaining > 0)
         {
             if (!TrySpendStamina(jumpStaminaCost))
                 return;
@@ -561,53 +572,31 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    private IEnumerator FadeDeathPanel(float targetAlpha)
+    private void JumpFX()
     {
-        if (deathPanel == null) yield break;
+        animator.SetTrigger("jump");
 
-        float startAlpha = deathPanel.alpha;
-        float elapsed = 0f;
-
-        // Если цель — показать, включаем взаимодействие сразу
-        if (targetAlpha > 0f)
+        if (smokeFX != null)
         {
-            deathPanel.interactable = true;
-            deathPanel.blocksRaycasts = true;
-        }
-
-        while (elapsed < fadeDuration)
-        {
-            elapsed += Time.deltaTime;
-            deathPanel.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / fadeDuration);
-            yield return null;
-        }
-
-        deathPanel.alpha = targetAlpha;
-
-        // Если скрываем — отключаем взаимодействие
-        if (targetAlpha == 0f)
-        {
-            deathPanel.interactable = false;
-            deathPanel.blocksRaycasts = false;
+            smokeFX.Play();
         }
     }
 
-
-
     private void GroundCheck()
     {
-
-        bool groundedNow = Physics2D.OverlapBox(
+        Collider2D groundHit = Physics2D.OverlapBox(
             groundCheckPos.position,
             groundCheckSize,
-            0,
+            0f,
             groundLayer
         );
 
-        // ПРИЗЕМЛЕНИЕ
+        bool groundedNow = groundHit != null;
+
         if (!wasGrounded && groundedNow)
         {
             OnLand();
+            hasAirDash = true;
         }
 
         isGrounded = groundedNow;
@@ -616,12 +605,14 @@ public class PlayerMovement : MonoBehaviour
         if (isGrounded)
         {
             jumpsRemaining = maxJumps;
-            canDash = true;
         }
     }
 
     private void OnLand()
     {
+        isWallJumping = false;
+        CancelInvoke(nameof(CancelWallJump));
+
         animator.SetTrigger("land");
 
         if (smokeFX != null)
@@ -632,12 +623,19 @@ public class PlayerMovement : MonoBehaviour
 
     private bool WallCheck()
     {
-        return Physics2D.OverlapBox(wallCheckPos.position, wallCheckSize, 0, wallLayer);
+        Collider2D wallHit = Physics2D.OverlapBox(
+            wallCheckPos.position,
+            wallCheckSize,
+            0f,
+            wallLayer
+        );
+
+        return wallHit != null;
     }
 
     private void ProcessGravity()
     {
-        if (rb.linearVelocity.y < 0)
+        if (rb.linearVelocity.y < 0f)
         {
             rb.gravityScale = baseGravity * fallGravityMult;
             rb.linearVelocity = new Vector2(
@@ -653,7 +651,17 @@ public class PlayerMovement : MonoBehaviour
 
     private void ProcessWallSlide()
     {
-        if (!isGrounded && WallCheck() && horizontalMovement != 0 && Mathf.Sign(horizontalMovement) == Mathf.Sign(transform.localScale.x))
+        if (isWallJumping)
+        {
+            isWallSliding = false;
+            return;
+        }
+
+        bool pushingIntoWall =
+            (horizontalMovement > 0f && isFacingRight) ||
+            (horizontalMovement < 0f && !isFacingRight);
+
+        if (!isGrounded && WallCheck() && horizontalMovement != 0f && pushingIntoWall)
         {
             isWallSliding = true;
 
@@ -670,10 +678,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void ProcessWallJump()
     {
+        if (isWallJumping)
+            return;
+
         if (isWallSliding)
         {
-            isWallJumping = false;
-            wallJumpDirection = -transform.localScale.x;
+            wallJumpDirection = isFacingRight ? -1f : 1f;
             wallJumpTimer = wallJumpTime;
 
             CancelInvoke(nameof(CancelWallJump));
@@ -691,10 +701,10 @@ public class PlayerMovement : MonoBehaviour
 
     private void Flip()
     {
-        if (horizontalMovement == 0) return;
+        if (horizontalMovement == 0f) return;
 
-        if (isFacingRight && horizontalMovement < 0 ||
-            !isFacingRight && horizontalMovement > 0)
+        if ((isFacingRight && horizontalMovement < 0f) ||
+            (!isFacingRight && horizontalMovement > 0f))
         {
             isFacingRight = !isFacingRight;
 
@@ -702,11 +712,85 @@ public class PlayerMovement : MonoBehaviour
             scale.x *= -1f;
             transform.localScale = scale;
 
-            if (rb.linearVelocity.y == 0 && smokeFX != null)
+            if (Mathf.Abs(rb.linearVelocity.y) < 0.01f && smokeFX != null)
             {
                 smokeFX.Play();
             }
         }
+    }
+
+    private void InterruptAttack()
+    {
+        if (attackCoroutine != null)
+        {
+            StopCoroutine(attackCoroutine);
+            attackCoroutine = null;
+        }
+
+        isAttacking = false;
+        comboStep = 0;
+        comboTimer = 0f;
+    }
+
+    private void InterruptDash(bool startCooldown)
+    {
+        if (dashCoroutine != null)
+        {
+            StopCoroutine(dashCoroutine);
+            dashCoroutine = null;
+        }
+
+        isDashing = false;
+
+        if (trailRenderer != null)
+            trailRenderer.emitting = false;
+
+        rb.gravityScale = baseGravity;
+
+        if (startCooldown)
+        {
+            if (dashCooldownCoroutine != null)
+                StopCoroutine(dashCooldownCoroutine);
+
+            dashCooldownCoroutine = StartCoroutine(DashCooldownRoutine());
+        }
+    }
+
+    private IEnumerator DamageInvulnerabilityRoutine()
+    {
+        isInvulnerable = true;
+        yield return new WaitForSeconds(damageInvulnerabilityTime);
+        isInvulnerable = false;
+    }
+
+    public void TakeDamage(int damage)
+    {
+        if (isDead || isInvulnerable) return;
+
+        currentHealth -= damage;
+        currentHealth = Mathf.Max(currentHealth, 0);
+
+        bool lethal = currentHealth <= 0;
+
+        InterruptAttack();
+        InterruptDash(!lethal);
+
+        isSprinting = false;
+        isWallJumping = false;
+        jumpBufferCounter = 0f;
+
+        animator.SetTrigger("Hit");
+
+        float hitDirection = isFacingRight ? -1f : 1f;
+        rb.linearVelocity = new Vector2(hitDirection * hitKnockbackX, hitKnockbackY);
+
+        if (lethal)
+        {
+            Die();
+            return;
+        }
+
+        StartCoroutine(DamageInvulnerabilityRoutine());
     }
 
     private void Die()
@@ -714,10 +798,13 @@ public class PlayerMovement : MonoBehaviour
         if (isDead) return;
         isDead = true;
 
-        animator.SetTrigger("IsDead");
+        InterruptAttack();
+        InterruptDash(false);
 
-        // Отключаем управление
-        enabled = false;
+        isSprinting = false;
+        isWallJumping = false;
+
+        animator.SetTrigger("IsDead");
 
         rb.linearVelocity = Vector2.zero;
         rb.gravityScale = 0f;
@@ -725,25 +812,47 @@ public class PlayerMovement : MonoBehaviour
         if (playerCollider != null)
             playerCollider.enabled = false;
 
-        // Показать панель смерти
         if (deathPanel != null)
             StartCoroutine(ShowDeathUI());
-
-        // Не сразу перезагружаем сцену, ждём действия игрока
     }
 
     private IEnumerator ShowDeathUI()
     {
-        // Плавно затемняем
         yield return StartCoroutine(FadeDeathPanel(1f));
 
-        // Показываем надпись и кнопки
         if (deathText != null) deathText.SetActive(true);
         if (restartButton != null) restartButton.SetActive(true);
         if (mainMenuButton != null) mainMenuButton.SetActive(true);
     }
 
+    private IEnumerator FadeDeathPanel(float targetAlpha)
+    {
+        if (deathPanel == null) yield break;
 
+        float startAlpha = deathPanel.alpha;
+        float elapsed = 0f;
+
+        if (targetAlpha > 0f)
+        {
+            deathPanel.interactable = true;
+            deathPanel.blocksRaycasts = true;
+        }
+
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            deathPanel.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / fadeDuration);
+            yield return null;
+        }
+
+        deathPanel.alpha = targetAlpha;
+
+        if (targetAlpha == 0f)
+        {
+            deathPanel.interactable = false;
+            deathPanel.blocksRaycasts = false;
+        }
+    }
 
     public void RestartScene()
     {
@@ -752,31 +861,9 @@ public class PlayerMovement : MonoBehaviour
 
     public void ReturnToMenu()
     {
-        SceneManager.LoadScene("Menu"); // замените на ваше имя сцены меню
+        SceneManager.LoadScene("Menu");
     }
 
-
-    IEnumerator Death()
-    {
-        yield return new WaitForSeconds(10f); // немного подождать
-    }
-
-    private IEnumerator FadeInDeathPanel()
-    {
-        float elapsed = 0f;
-        while (elapsed < fadeDuration)
-        {
-            elapsed += Time.deltaTime;
-            deathPanel.alpha = Mathf.Clamp01(elapsed / fadeDuration);
-            yield return null;
-        }
-
-        deathPanel.alpha = 1f;
-
-        // Делаем панель интерактивной после появления
-        deathPanel.interactable = true;
-        deathPanel.blocksRaycasts = true;
-    }
     public void OnRestartButton()
     {
         StartCoroutine(FadeAndLoadScene(SceneManager.GetActiveScene().name));
@@ -789,74 +876,46 @@ public class PlayerMovement : MonoBehaviour
 
     private IEnumerator FadeAndLoadScene(string sceneName)
     {
-        // Плавное затемнение, если нужно
         if (deathPanel != null)
             yield return StartCoroutine(FadeDeathPanel(1f));
 
         SceneManager.LoadScene(sceneName);
     }
 
-    public void TakeDamage(int damage)
-    {
-        if (isDead) return;
-
-        currentHealth -= damage;
-
-        // Анимация удара
-        animator.SetTrigger("Hit");
-
-        // небольшой отскок (по желанию)
-        rb.linearVelocity = new Vector2(
-            -transform.localScale.x * 3f,
-            5f
-        );
-
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
-    }
-
     private void TriggerRipple()
     {
-        if (rippleMaterial == null) return;
+        if (rippleMaterial == null || Camera.main == null) return;
 
         Vector3 vp = Camera.main.WorldToViewportPoint(transform.position);
-
-        rippleMaterial.SetVector("_RippleCenter", new Vector4(vp.x, vp.y, 0, 0));
+        rippleMaterial.SetVector("_RippleCenter", new Vector4(vp.x, vp.y, 0f, 0f));
     }
 
-    // Метод вызывается для броска пули
     public void Throw()
     {
         if (!canThrow || bulletPrefab == null || firePoint == null)
             return;
 
-        // Позиция мыши в мире
+        if (Camera.main == null)
+            return;
+
         Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         mouseWorldPos.z = 0f;
 
-        // Направление броска
         Vector2 direction = (mouseWorldPos - firePoint.position).normalized;
 
-        // Создаём пулю
         GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
 
-        // Присваиваем скорость Rigidbody2D
-        Rigidbody2D rb = bullet.GetComponent<Rigidbody2D>();
-        if (rb != null)
-            rb.linearVelocity = direction * throwForce;
+        Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
+        if (bulletRb != null)
+            bulletRb.linearVelocity = direction * throwForce;
 
-        // Поворачиваем пулю в сторону движения
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
         bullet.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
-        // Прокидываем слои, при которых пуля умирает
         Bullet bulletScript = bullet.GetComponent<Bullet>();
         if (bulletScript != null)
             bulletScript.destroyOnLayers = destroyLayers;
 
-        // Старт кулдауна
         canThrow = false;
         StartCoroutine(ResetThrowCooldown());
     }
@@ -867,13 +926,12 @@ public class PlayerMovement : MonoBehaviour
         canThrow = true;
     }
 
-    // Публичные методы для доступа к состоянию стамины (для UI)
     public float GetStaminaPercentage()
     {
-        return (float)currentStamina / maxStamina;
+        return currentStamina / maxStamina;
     }
 
-    public bool HasEnoughStamina(int cost)
+    public bool HasEnoughStamina(float cost)
     {
         return currentStamina >= cost;
     }
