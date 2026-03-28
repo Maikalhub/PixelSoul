@@ -2,7 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Cinemachine;
-using UnityEngine.SceneManagement;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -47,8 +46,8 @@ public class PlayerMovement : MonoBehaviour
     public float dashDuration = 0.2f;
     public float dashCooldown = 0.5f;
     private bool isDashing;
-    private bool canDash = true;     // отвечает только за кулдаун
-    private bool hasAirDash = true;  // отвечает только за воздушный дэш
+    private bool canDash = true;
+    private bool hasAirDash = true;
     private TrailRenderer trailRenderer;
 
     [Header("Jumping")]
@@ -111,6 +110,9 @@ public class PlayerMovement : MonoBehaviour
     public int currentHealth;
     public bool isDead;
 
+    [Header("Derived Stats")]
+    public int defenseStat = 0;
+
     [Header("Stamina")]
     public float maxStamina = 100f;
     public float currentStamina;
@@ -124,18 +126,14 @@ public class PlayerMovement : MonoBehaviour
     public float wallJumpStaminaCost = 15f;
     public float attackStaminaCost = 15f;
     public float throwStaminaCost = 25f;
-    public float sprintStaminaCost = 5f; // в секунду
+    public float sprintStaminaCost = 5f;
 
     [Header("Jump Buffer")]
     public float jumpBufferTime = 0.15f;
     private float jumpBufferCounter;
 
-    [Header("Death UI")]
-    public CanvasGroup deathPanel;
-    public float fadeDuration = 1f;
-    public GameObject deathText;
-    public GameObject restartButton;
-    public GameObject mainMenuButton;
+    [Header("Death Screen")]
+    public DeathScreenController deathScreen;
 
     [Header("Damage Feedback")]
     public float hitKnockbackX = 3f;
@@ -167,17 +165,6 @@ public class PlayerMovement : MonoBehaviour
         }
 
         impulseSource = GetComponent<CinemachineImpulseSource>();
-
-        if (deathPanel != null)
-        {
-            deathPanel.alpha = 0f;
-            deathPanel.interactable = false;
-            deathPanel.blocksRaycasts = false;
-        }
-
-        if (deathText != null) deathText.SetActive(false);
-        if (restartButton != null) restartButton.SetActive(false);
-        if (mainMenuButton != null) mainMenuButton.SetActive(false);
     }
 
     private void Update()
@@ -536,7 +523,6 @@ public class PlayerMovement : MonoBehaviour
     {
         if (isDashing || isAttacking) return;
 
-        // WALL JUMP
         if (jumpBufferCounter > 0f && wallJumpTimer > 0f)
         {
             if (!TrySpendStamina(wallJumpStaminaCost))
@@ -557,7 +543,6 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        // NORMAL / DOUBLE JUMP
         if (jumpBufferCounter > 0f && jumpsRemaining > 0)
         {
             if (!TrySpendStamina(jumpStaminaCost))
@@ -767,7 +752,8 @@ public class PlayerMovement : MonoBehaviour
     {
         if (isDead || isInvulnerable) return;
 
-        currentHealth -= damage;
+        int finalDamage = Mathf.Max(damage - defenseStat, 1);
+        currentHealth -= finalDamage;
         currentHealth = Mathf.Max(currentHealth, 0);
 
         bool lethal = currentHealth <= 0;
@@ -812,74 +798,10 @@ public class PlayerMovement : MonoBehaviour
         if (playerCollider != null)
             playerCollider.enabled = false;
 
-        if (deathPanel != null)
-            StartCoroutine(ShowDeathUI());
-    }
-
-    private IEnumerator ShowDeathUI()
-    {
-        yield return StartCoroutine(FadeDeathPanel(1f));
-
-        if (deathText != null) deathText.SetActive(true);
-        if (restartButton != null) restartButton.SetActive(true);
-        if (mainMenuButton != null) mainMenuButton.SetActive(true);
-    }
-
-    private IEnumerator FadeDeathPanel(float targetAlpha)
-    {
-        if (deathPanel == null) yield break;
-
-        float startAlpha = deathPanel.alpha;
-        float elapsed = 0f;
-
-        if (targetAlpha > 0f)
-        {
-            deathPanel.interactable = true;
-            deathPanel.blocksRaycasts = true;
-        }
-
-        while (elapsed < fadeDuration)
-        {
-            elapsed += Time.deltaTime;
-            deathPanel.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / fadeDuration);
-            yield return null;
-        }
-
-        deathPanel.alpha = targetAlpha;
-
-        if (targetAlpha == 0f)
-        {
-            deathPanel.interactable = false;
-            deathPanel.blocksRaycasts = false;
-        }
-    }
-
-    public void RestartScene()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-
-    public void ReturnToMenu()
-    {
-        SceneManager.LoadScene("Menu");
-    }
-
-    public void OnRestartButton()
-    {
-        StartCoroutine(FadeAndLoadScene(SceneManager.GetActiveScene().name));
-    }
-
-    public void OnMainMenuButton()
-    {
-        StartCoroutine(FadeAndLoadScene("Menu"));
-    }
-
-    private IEnumerator FadeAndLoadScene(string sceneName)
-    {
-        if (deathPanel != null)
-            yield return StartCoroutine(FadeDeathPanel(1f));
-
-        SceneManager.LoadScene(sceneName);
+        if (deathScreen != null)
+            deathScreen.ShowDeathScreen();
+        else
+            Debug.LogWarning("DeathScreenController не назначен в PlayerMovement.");
     }
 
     private void TriggerRipple()
@@ -924,6 +846,131 @@ public class PlayerMovement : MonoBehaviour
     {
         yield return new WaitForSeconds(cooldown);
         canThrow = true;
+    }
+
+    public bool TryUseInventoryItem(ItemData item)
+    {
+        if (item == null || !item.canUse || isDead)
+            return false;
+
+        ApplyItemEffect(item);
+        return true;
+    }
+
+    private void ApplyItemEffect(ItemData item)
+    {
+        bool isInstantEffect =
+            item.useEffectType == ItemUseEffectType.RestoreHealth ||
+            item.useEffectType == ItemUseEffectType.RestoreStamina;
+
+        ApplyEffectValue(item.useEffectType, item.useValue);
+
+        if (item.isTemporaryBuff && !isInstantEffect && item.buffDuration > 0f)
+        {
+            StartCoroutine(RemoveTemporaryBuffAfterTime(
+                item.useEffectType,
+                item.useValue,
+                item.buffDuration));
+        }
+    }
+
+    private void ApplyEffectValue(ItemUseEffectType effectType, float value)
+    {
+        int intValue = Mathf.RoundToInt(value);
+
+        switch (effectType)
+        {
+            case ItemUseEffectType.Damage:
+                attackDamage += intValue;
+                break;
+
+            case ItemUseEffectType.Defense:
+                defenseStat += intValue;
+                break;
+
+            case ItemUseEffectType.MaxHealth:
+                maxHealth += intValue;
+                currentHealth = Mathf.Clamp(currentHealth + intValue, 0, maxHealth);
+                break;
+
+            case ItemUseEffectType.RestoreHealth:
+                currentHealth = Mathf.Clamp(currentHealth + intValue, 0, maxHealth);
+                break;
+
+            case ItemUseEffectType.MaxStamina:
+                maxStamina += value;
+                currentStamina = Mathf.Clamp(currentStamina + value, 0f, maxStamina);
+                break;
+
+            case ItemUseEffectType.RestoreStamina:
+                currentStamina = Mathf.Clamp(currentStamina + value, 0f, maxStamina);
+                break;
+
+            case ItemUseEffectType.MoveSpeed:
+                moveSpeed += value;
+                break;
+
+            case ItemUseEffectType.JumpPower:
+                jumpPower += value;
+                break;
+
+            case ItemUseEffectType.SprintMultiplier:
+                sprintMultiplier += value;
+                break;
+
+            case ItemUseEffectType.DashSpeed:
+                dashSpeed += value;
+                break;
+        }
+    }
+
+    private IEnumerator RemoveTemporaryBuffAfterTime(ItemUseEffectType effectType, float value, float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        RemoveEffectValue(effectType, value);
+        Debug.Log($"{effectType} buff ended");
+    }
+
+    private void RemoveEffectValue(ItemUseEffectType effectType, float value)
+    {
+        int intValue = Mathf.RoundToInt(value);
+
+        switch (effectType)
+        {
+            case ItemUseEffectType.Damage:
+                attackDamage -= intValue;
+                break;
+
+            case ItemUseEffectType.Defense:
+                defenseStat = Mathf.Max(0, defenseStat - intValue);
+                break;
+
+            case ItemUseEffectType.MaxHealth:
+                maxHealth = Mathf.Max(1, maxHealth - intValue);
+                currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+                break;
+
+            case ItemUseEffectType.MaxStamina:
+                maxStamina = Mathf.Max(1f, maxStamina - value);
+                currentStamina = Mathf.Clamp(currentStamina, 0f, maxStamina);
+                break;
+
+            case ItemUseEffectType.MoveSpeed:
+                moveSpeed = Mathf.Max(0.1f, moveSpeed - value);
+                break;
+
+            case ItemUseEffectType.JumpPower:
+                jumpPower = Mathf.Max(0.1f, jumpPower - value);
+                break;
+
+            case ItemUseEffectType.SprintMultiplier:
+                sprintMultiplier = Mathf.Max(1f, sprintMultiplier - value);
+                break;
+
+            case ItemUseEffectType.DashSpeed:
+                dashSpeed = Mathf.Max(0.1f, dashSpeed - value);
+                break;
+        }
     }
 
     public float GetStaminaPercentage()

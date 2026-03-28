@@ -23,8 +23,8 @@ public class TooltipUI : MonoBehaviour
     public Canvas canvas;
 
     [Header("Tooltip Positioning")]
-    public TooltipPosition position = TooltipPosition.Bottom; // По умолчанию снизу курсора
-    public Vector2 customOffset = new Vector2(0, -50);       // Используется если position = Custom
+    public TooltipPosition position = TooltipPosition.Bottom;
+    public Vector2 customOffset = new Vector2(0, -50);
 
     public static TooltipUI Instance;
 
@@ -37,8 +37,8 @@ public class TooltipUI : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-        Instance = this;
 
+        Instance = this;
         rectTransform = GetComponent<RectTransform>();
 
         if (canvas == null)
@@ -73,10 +73,52 @@ public class TooltipUI : MonoBehaviour
     private string GetStatsText(ItemData item)
     {
         string stats = "";
+
         if (item.damage > 0) stats += $"Damage: {item.damage}\n";
         if (item.defense > 0) stats += $"Defense: {item.defense}\n";
         if (item.health > 0) stats += $"HP: {item.health}\n";
-        return stats;
+
+        string useText = GetUseText(item);
+        if (!string.IsNullOrEmpty(useText))
+            stats += useText;
+
+        return stats.TrimEnd();
+    }
+
+    private string GetUseText(ItemData item)
+    {
+        if (item == null || !item.canUse || item.useEffectType == ItemUseEffectType.None)
+            return "";
+
+        string effectName = "";
+
+        switch (item.useEffectType)
+        {
+            case ItemUseEffectType.Damage: effectName = "Buff Damage"; break;
+            case ItemUseEffectType.Defense: effectName = "Buff Defense"; break;
+            case ItemUseEffectType.MaxHealth: effectName = "Buff Max HP"; break;
+            case ItemUseEffectType.RestoreHealth: effectName = "Heal"; break;
+            case ItemUseEffectType.MaxStamina: effectName = "Buff Max Stamina"; break;
+            case ItemUseEffectType.RestoreStamina: effectName = "Restore Stamina"; break;
+            case ItemUseEffectType.MoveSpeed: effectName = "Buff Move Speed"; break;
+            case ItemUseEffectType.JumpPower: effectName = "Buff Jump"; break;
+            case ItemUseEffectType.SprintMultiplier: effectName = "Buff Sprint"; break;
+            case ItemUseEffectType.DashSpeed: effectName = "Buff Dash"; break;
+        }
+
+        string valueText = item.useValue.ToString("0.##");
+
+        bool instant =
+            item.useEffectType == ItemUseEffectType.RestoreHealth ||
+            item.useEffectType == ItemUseEffectType.RestoreStamina;
+
+        if (instant)
+            return $"{effectName}: {valueText}\n";
+
+        if (item.isTemporaryBuff)
+            return $"{effectName}: +{valueText} ({item.buffDuration:0.##} sec)\n";
+
+        return $"{effectName}: +{valueText} (permanent)\n";
     }
 
     void Update()
@@ -93,7 +135,6 @@ public class TooltipUI : MonoBehaviour
             out localPoint
         );
 
-        // Выбираем смещение по типу позиции
         Vector2 offset = Vector2.zero;
         switch (position)
         {
@@ -106,7 +147,6 @@ public class TooltipUI : MonoBehaviour
 
         Vector2 anchoredPos = localPoint + offset;
 
-        // Ограничение по Canvas
         Vector2 minPosition = new Vector2(
             -canvasRect.rect.width / 2 + rectTransform.rect.width / 2,
             -canvasRect.rect.height / 2 + rectTransform.rect.height / 2

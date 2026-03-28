@@ -15,9 +15,15 @@ MonoBehaviour:
   itemName: BonesGem
   icon: {fileID: 8191192442796918721, guid: bdbffa39844dd5443bd544bcee4e467d, type: 3}
   description: Bone gem that drops from enemies that do not increase stats
-  itemType: 0
-  damage: 0
-  defense: 0
-  health: 0
+  itemType: 3
+  damage: 10
+  defense: 10
+  health: 100
+  canUse: 1
+  consumeOnUse: 1
+  useEffectType: 4
+  useValue: 1
+  isTemporaryBuff: 0
+  buffDuration: 0
   stackable: 1
   maxStack: 99
