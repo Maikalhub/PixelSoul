@@ -6,7 +6,7 @@ public class CoinSystem : MonoBehaviour
     public static CoinSystem Instance;
     private void Awake() => Instance = this;
 
-    public int CurrentCoins = 5; // Начальное количество
+    public int CurrentCoins = 1; // Начальное количество
     public TMP_Text coinText;
 
     public void AddCoins(int amount)

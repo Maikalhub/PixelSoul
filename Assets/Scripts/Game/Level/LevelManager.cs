@@ -28,6 +28,26 @@ public class LevelManager : MonoBehaviour
 
         [Header("Какие объекты включить при входе на этот уровень")]
         public GameObject[] objectsToEnableOnEnter;
+
+        [Header("Audio")]
+        [Tooltip("Массив фоновых треков для этого уровня")]
+        public AudioClip[] backgroundMusicClips;
+
+        [Tooltip("Случайные ambient-звуки: скрип, ветер, капли, стук и т.д.")]
+        public AudioClip[] randomAmbientClips;
+
+        [Tooltip("Минимальная и максимальная задержка между случайными звуками")]
+        public Vector2 ambientRandomDelayRange = new Vector2(8f, 18f);
+
+        [Tooltip("Диапазон громкости случайных ambient-звуков")]
+        public Vector2 ambientRandomVolumeRange = new Vector2(0.25f, 0.6f);
+
+        [Header("Блокировка уровня")]
+        [Tooltip("Если включено, уровень откроется только после прохождения указанных уровней")]
+        public bool lockedUntilRequiredLevelsCompleted = false;
+
+        [Tooltip("Индексы уровней из массива Levels, которые должны быть пройдены")]
+        public int[] requiredCompletedLevelIndices;
     }
 
     [Header("Игрок")]
@@ -55,6 +75,7 @@ public class LevelManager : MonoBehaviour
     [SerializeField] private float fadeDuration = 0.35f;
 
     private readonly List<Image> spawnedKeyIcons = new();
+    private readonly HashSet<int> completedLevels = new();
 
     private int currentLevelIndex;
     private int collectedKeys;
@@ -127,15 +148,31 @@ public class LevelManager : MonoBehaviour
     {
         if (isTransitioning) return;
 
+        if (targetLevelIndex < 0 || targetLevelIndex >= levels.Length)
+        {
+            Debug.LogWarning($"LevelManager: targetLevelIndex {targetLevelIndex} вне диапазона.");
+            return;
+        }
+
         if (requireAllKeys && collectedKeys < CurrentLevel.keysOnLevel)
         {
             Debug.Log("Нужно собрать все ключи.");
             return;
         }
 
-        if (targetLevelIndex < 0 || targetLevelIndex >= levels.Length)
+        // Если дверь требует все ключи, считаем текущий уровень пройденным
+        if (requireAllKeys)
         {
-            Debug.LogWarning($"LevelManager: targetLevelIndex {targetLevelIndex} вне диапазона.");
+            MarkLevelCompleted(currentLevelIndex);
+        }
+
+        // Проверяем, открыт ли целевой уровень
+        if (!IsLevelUnlocked(targetLevelIndex))
+        {
+            Debug.Log(
+                $"Уровень \"{levels[targetLevelIndex].levelName}\" заблокирован. " +
+                $"Нужно пройти: {GetRequiredLevelsNames(targetLevelIndex)}"
+            );
             return;
         }
 
@@ -189,6 +226,24 @@ public class LevelManager : MonoBehaviour
 
         ApplyObjectsState(level);
         SetupCurrentLevelUIOnly();
+        ApplyAudioForCurrentLevel();
+    }
+
+    private void ApplyAudioForCurrentLevel()
+    {
+        if (AudioManager.Instance == null)
+            return;
+
+        LevelData level = CurrentLevel;
+        if (level == null)
+            return;
+
+        AudioManager.Instance.PlayLevelAudio(
+            level.backgroundMusicClips,
+            level.randomAmbientClips,
+            level.ambientRandomDelayRange,
+            level.ambientRandomVolumeRange
+        );
     }
 
     private void ApplyObjectsState(LevelData level)
@@ -237,27 +292,33 @@ public class LevelManager : MonoBehaviour
 
         spawnedKeyIcons.Clear();
 
-        for (int i = 0; i < CurrentLevel.keysOnLevel; i++)
+        int keysCount = Mathf.Max(0, CurrentLevel.keysOnLevel);
+
+        for (int i = 0; i < keysCount; i++)
         {
             Image icon = Instantiate(keyIconPrefab, rootRect);
-            RectTransform rect = icon.rectTransform;
+            icon.gameObject.SetActive(true);
 
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(-i * keySpacing, 0f);
+            RectTransform iconRect = icon.rectTransform;
+            iconRect.anchoredPosition = new Vector2(i * keySpacing, 0f);
+            iconRect.localScale = Vector3.one;
 
-            icon.color = defaultKeyColor;
             spawnedKeyIcons.Add(icon);
         }
     }
 
     private void UpdateKeyUI()
     {
+        if (spawnedKeyIcons == null || spawnedKeyIcons.Count == 0)
+            return;
+
         for (int i = 0; i < spawnedKeyIcons.Count; i++)
         {
             if (spawnedKeyIcons[i] == null) continue;
-            spawnedKeyIcons[i].color = i < collectedKeys ? collectedKeyColor : defaultKeyColor;
+
+            spawnedKeyIcons[i].color = i < collectedKeys
+                ? collectedKeyColor
+                : defaultKeyColor;
         }
     }
 
@@ -268,12 +329,12 @@ public class LevelManager : MonoBehaviour
 
         Color color = fadeImage.color;
         float startAlpha = color.a;
-        float time = 0f;
+        float elapsed = 0f;
 
-        while (time < fadeDuration)
+        while (elapsed < fadeDuration)
         {
-            time += Time.deltaTime;
-            float t = Mathf.Clamp01(time / fadeDuration);
+            elapsed += Time.deltaTime;
+            float t = fadeDuration <= 0f ? 1f : Mathf.Clamp01(elapsed / fadeDuration);
 
             color.a = Mathf.Lerp(startAlpha, targetAlpha, t);
             fadeImage.color = color;
@@ -283,5 +344,96 @@ public class LevelManager : MonoBehaviour
 
         color.a = targetAlpha;
         fadeImage.color = color;
+    }
+
+    public void MarkLevelCompleted(int levelIndex)
+    {
+        if (levelIndex < 0 || levelIndex >= levels.Length)
+            return;
+
+        if (completedLevels.Add(levelIndex))
+        {
+            Debug.Log($"Уровень пройден: {levels[levelIndex].levelName}");
+        }
+    }
+
+    public bool IsLevelCompleted(int levelIndex)
+    {
+        return completedLevels.Contains(levelIndex);
+    }
+
+    public bool IsLevelUnlocked(int levelIndex)
+    {
+        if (levelIndex < 0 || levelIndex >= levels.Length)
+            return false;
+
+        LevelData targetLevel = levels[levelIndex];
+
+        if (!targetLevel.lockedUntilRequiredLevelsCompleted)
+            return true;
+
+        if (targetLevel.requiredCompletedLevelIndices == null ||
+            targetLevel.requiredCompletedLevelIndices.Length == 0)
+            return true;
+
+        for (int i = 0; i < targetLevel.requiredCompletedLevelIndices.Length; i++)
+        {
+            int requiredIndex = targetLevel.requiredCompletedLevelIndices[i];
+
+            if (requiredIndex < 0 || requiredIndex >= levels.Length)
+            {
+                Debug.LogWarning(
+                    $"LevelManager: у уровня \"{targetLevel.levelName}\" " +
+                    $"указан некорректный requiredCompletedLevelIndex = {requiredIndex}"
+                );
+                return false;
+            }
+
+            if (!completedLevels.Contains(requiredIndex))
+                return false;
+        }
+
+        return true;
+    }
+
+    public string GetRequiredLevelsNames(int levelIndex)
+    {
+        if (levelIndex < 0 || levelIndex >= levels.Length)
+            return string.Empty;
+
+        LevelData targetLevel = levels[levelIndex];
+
+        if (targetLevel.requiredCompletedLevelIndices == null ||
+            targetLevel.requiredCompletedLevelIndices.Length == 0)
+            return string.Empty;
+
+        List<string> names = new List<string>();
+
+        for (int i = 0; i < targetLevel.requiredCompletedLevelIndices.Length; i++)
+        {
+            int requiredIndex = targetLevel.requiredCompletedLevelIndices[i];
+
+            if (requiredIndex >= 0 && requiredIndex < levels.Length)
+                names.Add(levels[requiredIndex].levelName);
+            else
+                names.Add($"Index {requiredIndex}");
+        }
+
+        return string.Join(", ", names);
+    }
+
+    public int GetCollectedKeys()
+    {
+        return collectedKeys;
+    }
+
+    public int GetRequiredKeysForCurrentLevel()
+    {
+        return CurrentLevel != null ? CurrentLevel.keysOnLevel : 0;
+    }
+
+    public string GetCurrentLevelName()
+    {
+        return CurrentLevel != null ? CurrentLevel.levelName : string.Empty;
     }
 }

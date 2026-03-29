@@ -14,7 +14,7 @@ PlayerSettings:
   accelerometerFrequency: 60
   companyName: TMA
   productName: PixelSoul
-  defaultCursor: {fileID: 2800000, guid: e9cba46ec36b47f429e7ec0423b8f541, type: 3}
+  defaultCursor: {fileID: 2800000, guid: 11c955c403c0dd04a98b4b5933569e7a, type: 3}
   cursorHotspot: {x: 3, y: 3}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
   m_ShowUnitySplashScreen: 1
@@ -143,7 +143,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 1.0
+  bundleVersion: beta-v
   preloadedAssets: []
   metroInputSource: 0
   wsaTransparentSwapchain: 0
@@ -296,7 +296,7 @@ PlayerSettings:
   - m_BuildTarget: 
     m_Icons:
     - serializedVersion: 2
-      m_Icon: {fileID: 2800000, guid: 7f8a505bf1c195c42b0b99edc797f362, type: 3}
+      m_Icon: {fileID: 2800000, guid: f4b2c53bd6989eb4898f9376176c25fe, type: 3}
       m_Width: 128
       m_Height: 128
       m_Kind: 0

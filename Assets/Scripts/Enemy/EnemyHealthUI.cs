@@ -1,4 +1,7 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 public class EnemyHealthUI : MonoBehaviour
 {
@@ -14,6 +17,14 @@ public class EnemyHealthUI : MonoBehaviour
     [SerializeField] private bool followEnemy = true;
     [SerializeField] private bool ignoreEnemyFlip = true;
 
+    [Header("Canvas UI (used when Follow Enemy = false)")]
+    [SerializeField] private TMP_Text canvasNameText;
+    [SerializeField] private Image canvasHealthImage;
+    [SerializeField] private string customObjectName;
+
+    [Header("Canvas Visibility")]
+    [SerializeField] private bool showCanvasOnlyAfterLevelStart = true;
+
     [Header("Flash Settings")]
     [SerializeField] private bool flashOnDamage = true;
     [SerializeField] private Color flashColor = Color.red;
@@ -23,13 +34,14 @@ public class EnemyHealthUI : MonoBehaviour
     private EnemyAI enemyAI;
     private int lastSpriteIndex = -1;
     private float maxHealth;
-    private Color originalColor;
+    private Color originalColor = Color.white;
     private bool isFlashing;
+    private bool isCanvasMode;
+    private bool canShowCanvas;
 
     private void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
-        originalColor = spriteRenderer.color;
 
         if (targetEnemy == null)
             targetEnemy = GetComponentInParent<EnemyAI>();
@@ -37,44 +49,150 @@ public class EnemyHealthUI : MonoBehaviour
         enemyAI = targetEnemy;
 
         if (enemyAI != null)
-            maxHealth = enemyAI.health;
+            maxHealth = Mathf.Max(1f, enemyAI.health);
+
+        RefreshDisplayMode();
+        UpdateNameDisplay();
+
+        // На старте скрываем Canvas UI, чтобы он не был виден до входа в уровень
+        canShowCanvas = !showCanvasOnlyAfterLevelStart;
+
+        if (isCanvasMode)
+            SetCanvasActive(false);
+    }
+
+    private void Start()
+    {
+        // Когда уровень уже загружен и сцена реально стартовала — разрешаем показывать UI
+        if (showCanvasOnlyAfterLevelStart)
+            canShowCanvas = true;
+
+        if (isCanvasMode && enemyAI != null && enemyAI.gameObject.activeInHierarchy && canShowCanvas)
+        {
+            SetCanvasActive(true);
+            UpdateHealthDisplay();
+        }
     }
 
     private void LateUpdate()
     {
-        if (enemyAI == null) return;
+        if (healthSprites == null || healthSprites.Length == 0)
+            return;
+
+        bool newCanvasMode = !followEnemy;
+
+        if (newCanvasMode != isCanvasMode)
+        {
+            RefreshDisplayMode();
+            UpdateNameDisplay();
+        }
+
+        if (enemyAI == null)
+        {
+            if (isCanvasMode)
+                SetCanvasActive(false);
+            return;
+        }
+
+        if (!canShowCanvas)
+        {
+            if (isCanvasMode)
+                SetCanvasActive(false);
+            return;
+        }
+
+        // Проверка активности врага
+        if (!enemyAI.gameObject.activeInHierarchy)
+        {
+            if (isCanvasMode)
+                SetCanvasActive(false);
+            return;
+        }
+        else
+        {
+            if (isCanvasMode)
+                SetCanvasActive(true);
+        }
 
         if (followEnemy)
         {
             transform.position = enemyAI.transform.position + offset;
-        }
 
-        // ?? Фикс поворота
-        if (ignoreEnemyFlip)
-        {
-            Vector3 scale = transform.localScale;
-            scale.x = Mathf.Abs(scale.x);
-            transform.localScale = scale;
+            if (ignoreEnemyFlip)
+            {
+                Vector3 scale = transform.localScale;
+                scale.x = Mathf.Abs(scale.x);
+                transform.localScale = scale;
+            }
         }
 
         UpdateHealthDisplay();
     }
 
+    private void RefreshDisplayMode()
+    {
+        isCanvasMode = !followEnemy;
+
+        if (isCanvasMode)
+        {
+            if (spriteRenderer != null)
+                spriteRenderer.enabled = false;
+
+            if (canvasHealthImage != null)
+                originalColor = canvasHealthImage.color;
+            else
+                originalColor = Color.white;
+        }
+        else
+        {
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.enabled = true;
+                originalColor = spriteRenderer.color;
+            }
+            else
+            {
+                originalColor = Color.white;
+            }
+        }
+    }
+
+    private void SetCanvasActive(bool isActive)
+    {
+        if (canvasNameText != null)
+            canvasNameText.gameObject.SetActive(isActive);
+
+        if (canvasHealthImage != null)
+            canvasHealthImage.gameObject.SetActive(isActive);
+    }
+
+    private void UpdateNameDisplay()
+    {
+        if (canvasNameText == null || enemyAI == null)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(customObjectName))
+            canvasNameText.text = customObjectName;
+        else
+            canvasNameText.text = enemyAI.gameObject.name;
+    }
+
     private void UpdateHealthDisplay()
     {
-        if (enemyAI.health <= 0)
-        {
-            spriteRenderer.sprite = healthSprites[healthSprites.Length - 1];
+        if (enemyAI == null || healthSprites == null || healthSprites.Length == 0)
             return;
-        }
 
         float currentHealth = Mathf.Max(0, enemyAI.health);
         int spriteIndex;
 
-        if (useHealthPercentage)
+        if (currentHealth <= 0)
+        {
+            spriteIndex = healthSprites.Length - 1;
+        }
+        else if (useHealthPercentage)
         {
             float percent = currentHealth / maxHealth;
-            spriteIndex = Mathf.FloorToInt((1 - percent) * (healthSprites.Length - 1));
+            spriteIndex = Mathf.FloorToInt((1f - percent) * (healthSprites.Length - 1));
         }
         else
         {
@@ -86,7 +204,7 @@ public class EnemyHealthUI : MonoBehaviour
 
         if (spriteIndex != lastSpriteIndex)
         {
-            spriteRenderer.sprite = healthSprites[spriteIndex];
+            SetHealthSprite(healthSprites[spriteIndex]);
 
             if (spriteIndex > lastSpriteIndex && flashOnDamage && !isFlashing)
                 StartCoroutine(Flash());
@@ -95,20 +213,48 @@ public class EnemyHealthUI : MonoBehaviour
         }
     }
 
-    private System.Collections.IEnumerator Flash()
+    private void SetHealthSprite(Sprite sprite)
+    {
+        if (isCanvasMode)
+        {
+            if (canvasHealthImage != null)
+                canvasHealthImage.sprite = sprite;
+        }
+        else
+        {
+            if (spriteRenderer != null)
+                spriteRenderer.sprite = sprite;
+        }
+    }
+
+    private void SetDisplayColor(Color color)
+    {
+        if (isCanvasMode)
+        {
+            if (canvasHealthImage != null)
+                canvasHealthImage.color = color;
+        }
+        else
+        {
+            if (spriteRenderer != null)
+                spriteRenderer.color = color;
+        }
+    }
+
+    private IEnumerator Flash()
     {
         isFlashing = true;
 
         for (int i = 0; i < 2; i++)
         {
-            spriteRenderer.color = flashColor;
-            yield return new WaitForSeconds(flashDuration / 2);
+            SetDisplayColor(flashColor);
+            yield return new WaitForSeconds(flashDuration / 2f);
 
-            spriteRenderer.color = originalColor;
-            yield return new WaitForSeconds(flashDuration / 2);
+            SetDisplayColor(originalColor);
+            yield return new WaitForSeconds(flashDuration / 2f);
         }
 
-        spriteRenderer.color = originalColor;
+        SetDisplayColor(originalColor);
         isFlashing = false;
     }
 }

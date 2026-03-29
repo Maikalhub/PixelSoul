@@ -140,6 +140,42 @@ public class PlayerMovement : MonoBehaviour
     public float hitKnockbackY = 5f;
     public float damageInvulnerabilityTime = 0.25f;
 
+    [Header("Character Audio")]
+    public AudioSource sfxSource;
+
+    [Header("Footstep Audio")]
+    public AudioClip[] footstepClips;
+    public float walkStepInterval = 0.45f;
+    public float sprintStepInterval = 0.28f;
+
+    [Header("Jump Audio")]
+    public AudioClip[] jumpClips;
+
+    [Header("Land Audio")]
+    public AudioClip[] landClips;
+
+    [Header("Dash Audio")]
+    public AudioClip[] dashClips;
+
+    [Header("Attack Audio")]
+    public AudioClip[] attackClips;
+
+    [Header("Throw Audio")]
+    public AudioClip[] throwClips;
+
+    [Header("Damage Audio")]
+    public AudioClip[] hitClips;
+
+    [Header("Death Audio")]
+    public AudioClip[] deathClips;
+
+    [Header("Wall Slide Audio")]
+    public AudioClip[] wallSlideClips;
+    public float wallSlideSoundInterval = 0.35f;
+
+    private float footstepTimer;
+    private float wallSlideSoundTimer;
+
     private Coroutine attackCoroutine;
     private Coroutine dashCoroutine;
     private Coroutine dashCooldownCoroutine;
@@ -165,6 +201,16 @@ public class PlayerMovement : MonoBehaviour
         }
 
         impulseSource = GetComponent<CinemachineImpulseSource>();
+
+        if (sfxSource == null)
+        {
+            sfxSource = GetComponent<AudioSource>();
+        }
+
+        if (sfxSource == null)
+        {
+            Debug.LogWarning("AudioSource не назначен в PlayerMovement.");
+        }
     }
 
     private void Update()
@@ -182,12 +228,18 @@ public class PlayerMovement : MonoBehaviour
             comboStep = 0;
 
         if (isDead)
+        {
+            footstepTimer = 0f;
+            wallSlideSoundTimer = 0f;
             return;
+        }
 
         GroundCheck();
         HandleSprintStamina();
         HandleStaminaRegeneration();
         HandleJumpBuffer();
+        HandleFootsteps();
+        HandleWallSlideAudio();
     }
 
     private void FixedUpdate()
@@ -316,6 +368,8 @@ public class PlayerMovement : MonoBehaviour
         if (!isGrounded)
             hasAirDash = false;
 
+        PlayRandomClip(dashClips);
+
         if (CameraShakeManager.Instance != null && impulseSource != null)
             CameraShakeManager.Instance.Shake(impulseSource);
 
@@ -359,6 +413,8 @@ public class PlayerMovement : MonoBehaviour
             attackCoroutine = null;
         }
 
+        PlayRandomClip(attackClips);
+
         attackCoroutine = StartCoroutine(AttackRoutine(trigger, lockTime));
         Debug.Log("Атака выполнена");
     }
@@ -374,6 +430,7 @@ public class PlayerMovement : MonoBehaviour
             }
 
             animator.SetTrigger("Throw");
+            PlayRandomClip(throwClips);
             Throw();
         }
     }
@@ -560,6 +617,7 @@ public class PlayerMovement : MonoBehaviour
     private void JumpFX()
     {
         animator.SetTrigger("jump");
+        PlayRandomClip(jumpClips);
 
         if (smokeFX != null)
         {
@@ -599,6 +657,7 @@ public class PlayerMovement : MonoBehaviour
         CancelInvoke(nameof(CancelWallJump));
 
         animator.SetTrigger("land");
+        PlayRandomClip(landClips);
 
         if (smokeFX != null)
         {
@@ -766,6 +825,7 @@ public class PlayerMovement : MonoBehaviour
         jumpBufferCounter = 0f;
 
         animator.SetTrigger("Hit");
+        PlayRandomClip(hitClips);
 
         float hitDirection = isFacingRight ? -1f : 1f;
         rb.linearVelocity = new Vector2(hitDirection * hitKnockbackX, hitKnockbackY);
@@ -791,6 +851,7 @@ public class PlayerMovement : MonoBehaviour
         isWallJumping = false;
 
         animator.SetTrigger("IsDead");
+        PlayRandomClip(deathClips);
 
         rb.linearVelocity = Vector2.zero;
         rb.gravityScale = 0f;
@@ -970,6 +1031,58 @@ public class PlayerMovement : MonoBehaviour
             case ItemUseEffectType.DashSpeed:
                 dashSpeed = Mathf.Max(0.1f, dashSpeed - value);
                 break;
+        }
+    }
+
+    private void HandleFootsteps()
+    {
+        if (!isGrounded || isDashing || isAttacking || isDead)
+        {
+            footstepTimer = 0f;
+            return;
+        }
+
+        if (Mathf.Abs(rb.linearVelocity.x) < 0.15f)
+        {
+            footstepTimer = 0f;
+            return;
+        }
+
+        footstepTimer -= Time.deltaTime;
+
+        if (footstepTimer <= 0f)
+        {
+            PlayRandomClip(footstepClips);
+            footstepTimer = isSprinting ? sprintStepInterval : walkStepInterval;
+        }
+    }
+
+    private void HandleWallSlideAudio()
+    {
+        if (!isWallSliding || isGrounded || isDead)
+        {
+            wallSlideSoundTimer = 0f;
+            return;
+        }
+
+        wallSlideSoundTimer -= Time.deltaTime;
+
+        if (wallSlideSoundTimer <= 0f)
+        {
+            PlayRandomClip(wallSlideClips);
+            wallSlideSoundTimer = wallSlideSoundInterval;
+        }
+    }
+
+    private void PlayRandomClip(AudioClip[] clips)
+    {
+        if (sfxSource == null || clips == null || clips.Length == 0)
+            return;
+
+        AudioClip clip = clips[Random.Range(0, clips.Length)];
+        if (clip != null)
+        {
+            sfxSource.PlayOneShot(clip);
         }
     }
 
