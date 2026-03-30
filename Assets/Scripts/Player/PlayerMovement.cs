@@ -21,6 +21,9 @@ public class PlayerMovement : MonoBehaviour
     public ParticleSystem smokeFX;
     public Collider2D playerCollider;
 
+    [Header("Flashlight")]
+    public FlashlightController flashlight;
+
     private bool isFacingRight = true;
     private bool wasGrounded;
 
@@ -181,6 +184,15 @@ public class PlayerMovement : MonoBehaviour
     private Coroutine dashCooldownCoroutine;
     private bool isInvulnerable;
 
+    public bool IsActuallyMoving =>
+        !isDead && (
+            Mathf.Abs(horizontalMovement) > 0.05f ||
+            Mathf.Abs(rb.linearVelocity.x) > 0.15f ||
+            Mathf.Abs(rb.linearVelocity.y) > 0.1f ||
+            isDashing ||
+            isWallSliding
+        );
+
     private void Start()
     {
         TriggerRipple();
@@ -210,6 +222,11 @@ public class PlayerMovement : MonoBehaviour
         if (sfxSource == null)
         {
             Debug.LogWarning("AudioSource не назначен в PlayerMovement.");
+        }
+
+        if (flashlight == null)
+        {
+            flashlight = GetComponentInChildren<FlashlightController>();
         }
     }
 
@@ -433,6 +450,12 @@ public class PlayerMovement : MonoBehaviour
             PlayRandomClip(throwClips);
             Throw();
         }
+    }
+
+    public void ToggleFlashlight(InputAction.CallbackContext context)
+    {
+        if (context.performed)
+            flashlight?.ToggleLight();
     }
 
     public void DropFromPlatform(InputAction.CallbackContext context)

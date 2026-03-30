@@ -7,19 +7,9 @@ using RangeAttribute = UnityEngine.RangeAttribute;
 [RequireComponent(typeof(Animator))]
 public class EnemyAI : MonoBehaviour
 {
-    // =====================================================
-    // ENUMS
-    // =====================================================
-
     public enum AIState { Patrolling, Chasing, Attacking, Evading, Idle, Alert, Retreating, Fleeing }
-
     public enum MovementMode { GroundOnly, SmartJump, JumpOnly }
-
     public enum AttackType { Standard, Charge, Ranged }
-
-    // =====================================================
-    // SETTINGS
-    // =====================================================
 
     [Header("AI Configuration")]
     public AIState currentState = AIState.Patrolling;
@@ -83,6 +73,11 @@ public class EnemyAI : MonoBehaviour
     public bool canChase = true;
     public bool canAttack = true;
 
+    [Header("Light Visibility")]
+    public bool startHidden = true;
+    [Range(0f, 1f)] public float hiddenAlpha = 0f;
+    public float fadeSpeed = 4f;
+
     [System.Serializable]
     public class DropItem
     {
@@ -90,22 +85,16 @@ public class EnemyAI : MonoBehaviour
         [Range(0f, 1f)] public float dropChance = 1f;
     }
 
-    // А `[Header]` ставим над полем массива DropItem
     [Header("Drop Settings")]
     public DropItem[] drops;
     public float dropForce = 3f;
     public string dropLayerName = "DropItem";
-    // =====================================================
-    // STUN SETTINGS
-    // =====================================================
+
     [Header("Stun Settings")]
     public float stunDuration = 1f;
     public Color stunColor = Color.red;
     public float blinkFrequency = 0.2f;
 
-    // =====================================================
-    // PRIVATE
-    // =====================================================
     private Rigidbody2D rb;
     private Animator animator;
     private Transform player;
@@ -118,9 +107,9 @@ public class EnemyAI : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private Color originalColor;
 
-    // =====================================================
-    // UNITY METHODS
-    // =====================================================
+    private float currentAlpha;
+    private float targetAlpha;
+    private Color currentVisualColor;
 
     private void Start()
     {
@@ -130,13 +119,23 @@ public class EnemyAI : MonoBehaviour
 
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
+        {
             originalColor = spriteRenderer.color;
+            currentVisualColor = originalColor;
+
+            currentAlpha = startHidden ? hiddenAlpha : 1f;
+            targetAlpha = currentAlpha;
+
+            ApplyVisual();
+        }
 
         currentPatrolIndex = 0;
     }
 
     private void Update()
     {
+        UpdateVisibilityFade();
+
         if (isDead || player == null || isStunned) return;
 
         float distance = Vector2.Distance(transform.position, player.position);
@@ -165,9 +164,6 @@ public class EnemyAI : MonoBehaviour
         }
     }
 
-    // =====================================================
-    // STATE LOGIC
-    // =====================================================
     private void HandleStateTransitions(float distance)
     {
         float healthPercent = health / 100f;
@@ -207,10 +203,6 @@ public class EnemyAI : MonoBehaviour
         else
             currentState = AIState.Idle;
     }
-
-    // =====================================================
-    // BEHAVIOURS
-    // =====================================================
 
     private void PatrolBehavior()
     {
@@ -347,10 +339,6 @@ public class EnemyAI : MonoBehaviour
         rb.velocity = new Vector2(0, rb.velocity.y);
     }
 
-    // =====================================================
-    // JUMP / GROUND / WALL
-    // =====================================================
-
     private void TryJump(float dir)
     {
         if (!IsGrounded() || Time.time - lastJumpTime < jumpCooldown) return;
@@ -382,9 +370,35 @@ public class EnemyAI : MonoBehaviour
         return hit.collider != null;
     }
 
-    // =====================================================
-    // DAMAGE + STUN
-    // =====================================================
+    public void SetLightVisible(bool visible)
+    {
+        targetAlpha = visible ? 1f : hiddenAlpha;
+    }
+
+    private void UpdateVisibilityFade()
+    {
+        if (spriteRenderer == null) return;
+
+        currentAlpha = Mathf.MoveTowards(
+            currentAlpha,
+            targetAlpha,
+            fadeSpeed * Time.deltaTime
+        );
+
+        ApplyVisual();
+    }
+
+    private void ApplyVisual()
+    {
+        if (spriteRenderer == null) return;
+
+        spriteRenderer.color = new Color(
+            currentVisualColor.r,
+            currentVisualColor.g,
+            currentVisualColor.b,
+            currentAlpha
+        );
+    }
 
     public void TakeDamageMethod(float damage, bool applyStun = false)
     {
@@ -417,14 +431,18 @@ public class EnemyAI : MonoBehaviour
             if (spriteRenderer != null)
             {
                 colorToggle = !colorToggle;
-                spriteRenderer.color = colorToggle ? stunColor : originalColor;
+                currentVisualColor = colorToggle ? stunColor : originalColor;
+                ApplyVisual();
             }
 
             yield return new WaitForSeconds(blinkFrequency);
         }
 
         if (spriteRenderer != null)
-            spriteRenderer.color = originalColor;
+        {
+            currentVisualColor = originalColor;
+            ApplyVisual();
+        }
 
         isStunned = false;
     }
@@ -478,10 +496,6 @@ public class EnemyAI : MonoBehaviour
         yield return new WaitForSeconds(delay);
         if (col != null) col.enabled = true;
     }
-
-    // =====================================================
-    // UTILITY
-    // =====================================================
 
     private void FaceTarget(Vector2 target)
     {
