@@ -8,7 +8,7 @@ public class SkillTree : MonoBehaviour
 
     [Header("References")]
     public GameObject SkillHolder;
-    public GameObject connectionPrefab; // prefab линии
+    public GameObject connectionPrefab;
 
     private List<Skill> SkillList = new List<Skill>();
     private List<SkillConnection> connections = new List<SkillConnection>();
@@ -17,19 +17,16 @@ public class SkillTree : MonoBehaviour
 
     private void Start()
     {
-        // Получаем все навыки
         foreach (Skill skill in SkillHolder.GetComponentsInChildren<Skill>())
         {
             SkillList.Add(skill);
             skill.skillSO.ResetSkill();
 
-            // создаём мапу SkillSO -> Skill
             if (!skillMap.ContainsKey(skill.skillSO))
                 skillMap.Add(skill.skillSO, skill);
         }
 
         GenerateConnections();
-
         UpdateAllSkillUI();
     }
 
@@ -47,9 +44,11 @@ public class SkillTree : MonoBehaviour
                 Skill to = skill;
 
                 GameObject line = Instantiate(connectionPrefab, SkillHolder.transform);
-                SkillConnection connection = line.GetComponent<SkillConnection>();
+                line.transform.SetAsFirstSibling();
 
+                SkillConnection connection = line.GetComponent<SkillConnection>();
                 connection.Setup(from, to);
+
                 connections.Add(connection);
             }
         }
@@ -75,6 +74,7 @@ public class SkillTree : MonoBehaviour
         foreach (SkillConnection connection in connections)
         {
             connection.UpdateConnection();
+            connection.UpdatePosition();
         }
     }
 }

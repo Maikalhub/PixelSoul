@@ -21,8 +21,8 @@ MonoBehaviour:
   health: 100
   canUse: 1
   consumeOnUse: 1
-  useEffectType: 4
-  useValue: 1
+  useEffectType: 0
+  useValue: 0
   isTemporaryBuff: 0
   buffDuration: 0
   stackable: 1

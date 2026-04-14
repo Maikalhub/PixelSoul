@@ -12,17 +12,25 @@ public class Skill : MonoBehaviour
     public TMP_Text titleText;
     public TMP_Text costText;
 
-    private Image iconImage;
-    private Button skillButton;
+    [Header("Assigned References")]
+    public Image iconImage;     // сюда назначаешь любой Image, в том числе дочерний
+    public Button skillButton;  // сюда тоже можно назначить кнопку вручную
 
     private void Awake()
     {
-        iconImage = GetComponent<Image>();
-        skillButton = GetComponent<Button>();
-        skillButton.onClick.AddListener(Buy);
+        // Если не назначил вручную — попробуем взять с текущего объекта
+        if (iconImage == null)
+            iconImage = GetComponent<Image>();
+
+        if (skillButton == null)
+            skillButton = GetComponent<Button>();
+
+        if (skillButton != null)
+            skillButton.onClick.AddListener(Buy);
+        else
+            Debug.LogWarning($"Skill on {gameObject.name}: Button не назначен.");
     }
 
-    // Проверяем зависимости и permanent lock
     public void CheckDependencies()
     {
         if (skillSO.permanentlyLocked)
@@ -39,8 +47,8 @@ public class Skill : MonoBehaviour
 
         if (skillSO.requireAll)
         {
-            // Логика И (все навыки должны быть изучены)
             bool canBeUnlocked = true;
+
             foreach (SkillSO previousSkill in skillSO.requiredSkills)
             {
                 if (previousSkill.isLocked)
@@ -49,12 +57,13 @@ public class Skill : MonoBehaviour
                     break;
                 }
             }
+
             skillSO.canBeUnlocked = canBeUnlocked;
         }
         else
         {
-            // Логика ИЛИ (хотя бы один навык изучен)
             bool canBeUnlocked = false;
+
             foreach (SkillSO previousSkill in skillSO.requiredSkills)
             {
                 if (!previousSkill.isLocked)
@@ -63,39 +72,58 @@ public class Skill : MonoBehaviour
                     break;
                 }
             }
+
             skillSO.canBeUnlocked = canBeUnlocked;
         }
     }
 
     public void UpdateUI()
     {
-        lockStatusText.text = !skillSO.isLocked ? "Unlocked" :
-                              skillSO.canBeUnlocked ? "Unlockable" : "Locked";
+        if (lockStatusText != null)
+        {
+            lockStatusText.text = !skillSO.isLocked ? "Unlocked" :
+                                  skillSO.canBeUnlocked ? "Unlockable" : "Locked";
+        }
 
-        titleText.text = skillSO.name;
-        costText.text = $"Cost: {skillSO.cost} coins";
+        if (titleText != null)
+            titleText.text = skillSO.name;
+
+        if (costText != null)
+            costText.text = $"{skillSO.cost} coins";
 
         // Иконка навыка
-        if (skillSO.skillIcon != null)
+        if (iconImage != null && skillSO.skillIcon != null)
         {
             iconImage.sprite = skillSO.skillIcon;
         }
 
-        // Цвет кнопки
-        if (skillSO.permanentlyLocked) iconImage.color = Color.gray;
-        else if (!skillSO.isLocked) iconImage.color = Color.green;
-        else if (skillSO.canBeUnlocked) iconImage.color = Color.yellow;
-        else iconImage.color = Color.white;
+        // Цвет иконки/объекта изображения
+        if (iconImage != null)
+        {
+            if (skillSO.permanentlyLocked)
+                iconImage.color = Color.gray;
+            else if (!skillSO.isLocked)
+                iconImage.color = Color.green;
+            else if (skillSO.canBeUnlocked)
+                iconImage.color = Color.yellow;
+            else
+                iconImage.color = Color.white;
+        }
 
         // Доступность кнопки
-        skillButton.interactable = skillSO.canBeUnlocked && skillSO.isLocked &&
-                                   !skillSO.permanentlyLocked &&
-                                   CoinSystem.Instance.CurrentCoins >= skillSO.cost;
+        if (skillButton != null)
+        {
+            skillButton.interactable = skillSO.canBeUnlocked &&
+                                       skillSO.isLocked &&
+                                       !skillSO.permanentlyLocked &&
+                                       CoinSystem.Instance.CurrentCoins >= skillSO.cost;
+        }
     }
 
     public void Buy()
     {
-        if (!skillSO.canBeUnlocked || !skillSO.isLocked || skillSO.permanentlyLocked) return;
+        if (!skillSO.canBeUnlocked || !skillSO.isLocked || skillSO.permanentlyLocked)
+            return;
 
         if (CoinSystem.Instance.SpendCoins(skillSO.cost))
         {

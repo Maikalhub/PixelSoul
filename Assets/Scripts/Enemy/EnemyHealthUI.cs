@@ -49,12 +49,11 @@ public class EnemyHealthUI : MonoBehaviour
         enemyAI = targetEnemy;
 
         if (enemyAI != null)
-            maxHealth = Mathf.Max(1f, enemyAI.health);
+            maxHealth = Mathf.Max(1f, enemyAI.maxHealth);
 
         RefreshDisplayMode();
         UpdateNameDisplay();
 
-        // На старте скрываем Canvas UI, чтобы он не был виден до входа в уровень
         canShowCanvas = !showCanvasOnlyAfterLevelStart;
 
         if (isCanvasMode)
@@ -63,7 +62,6 @@ public class EnemyHealthUI : MonoBehaviour
 
     private void Start()
     {
-        // Когда уровень уже загружен и сцена реально стартовала — разрешаем показывать UI
         if (showCanvasOnlyAfterLevelStart)
             canShowCanvas = true;
 
@@ -101,7 +99,6 @@ public class EnemyHealthUI : MonoBehaviour
             return;
         }
 
-        // Проверка активности врага
         if (!enemyAI.gameObject.activeInHierarchy)
         {
             if (isCanvasMode)

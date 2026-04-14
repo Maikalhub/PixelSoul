@@ -12,11 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a320509cd29634e4189ab44f5db30e48, type: 3}
   m_Name: Base
   m_EditorClassIdentifier: Assembly-CSharp::SkillSO
-  isLocked: 0
+  isLocked: 1
   canBeUnlocked: 1
   requiredSkills: []
   exclusiveSkills: []
+  requireAll: 1
   cost: 1
-  skillIcon: {fileID: -5967562619467940673, guid: 5e173a97f0647a34b8532af6a43cadc4, type: 3}
+  skillIcon: {fileID: 1009049853055315898, guid: 8c65b3f406b829441823d47c71ac3f5c, type: 3}
   saveProgress: 0
   permanentlyLocked: 0

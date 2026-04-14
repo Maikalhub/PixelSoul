@@ -1,62 +1,90 @@
-using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(Collider2D))]
 public class EnemyAttack : MonoBehaviour
 {
     private EnemyAI enemyAI;
+    private Collider2D hitbox;
+    private readonly HashSet<Collider2D> hitTargets = new HashSet<Collider2D>();
 
-    [Header("Knockback Settings")]
-    public float knockbackX = 5f;
-    public float knockbackY = 7f;
+    private bool attackWindowActive;
+
+    [Header("Knockback")]
+    public float knockbackX = 6f;
+    public float knockbackY = 3f;
+
+    private void Awake()
+    {
+        hitbox = GetComponent<Collider2D>();
+
+        if (hitbox != null)
+            hitbox.enabled = false;
+    }
 
     private void Start()
     {
         enemyAI = GetComponentInParent<EnemyAI>();
+
         if (enemyAI == null)
             Debug.LogError("EnemyAttack: EnemyAI not found on parent!");
     }
 
-    private void OnTriggerEnter2D(Collider2D other)
+    public void BeginAttackWindow()
     {
-        if (enemyAI == null) return;
+        attackWindowActive = true;
+        hitTargets.Clear();
 
-        if (other.CompareTag("Player"))
-        {
-            PlayerMovement player = other.GetComponent<PlayerMovement>();
-            if (player != null)
-            {
-                Rigidbody2D playerRb = player.rb;
-                if (playerRb != null)
-                {
-                    // Вектор от врага к игроку
-                    Vector2 direction = (playerRb.position - (Vector2)transform.position).normalized;
-
-                    // Knockback с отдельной силой по X и Y
-                    Vector2 knockback = new Vector2(
-                        Mathf.Sign(direction.x) * knockbackX,
-                        Mathf.Sign(direction.y) * knockbackY
-                    );
-
-                    // Обнуляем скорость и добавляем силу
-                    playerRb.linearVelocity = Vector2.zero;
-                    playerRb.AddForce(knockback, ForceMode2D.Impulse);
-
-                    StartCoroutine(ResetPlayerCollider(playerRb));
-                }
-
-                player.TakeDamage(enemyAI.attackDamage);
-                Debug.Log($"Enemy hit player for {enemyAI.attackDamage} damage with knockback!");
-            }
-        }
+        if (hitbox != null)
+            hitbox.enabled = true;
     }
 
-    private IEnumerator ResetPlayerCollider(Rigidbody2D playerRb)
+    public void EndAttackWindow()
     {
-        Collider2D col = playerRb.GetComponent<Collider2D>();
-        if (col == null) yield break;
+        attackWindowActive = false;
+        hitTargets.Clear();
 
-        col.enabled = false;
-        yield return new WaitForSeconds(0.1f);
-        col.enabled = true;
+        if (hitbox != null)
+            hitbox.enabled = false;
+    }
+
+    private void OnDisable()
+    {
+        EndAttackWindow();
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        TryHit(other);
+    }
+
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        TryHit(other);
+    }
+
+    private void TryHit(Collider2D other)
+    {
+        if (!attackWindowActive || enemyAI == null)
+            return;
+
+        if (!other.CompareTag("Player"))
+            return;
+
+        if (hitTargets.Contains(other))
+            return;
+
+        PlayerMovement player = other.GetComponent<PlayerMovement>();
+        if (player == null)
+            return;
+
+        hitTargets.Add(other);
+        player.TakeDamage(enemyAI.attackDamage);
+
+        if (player.rb != null)
+        {
+            float dir = other.transform.position.x > transform.position.x ? 1f : -1f;
+            player.rb.linearVelocity = new Vector2(dir * knockbackX, knockbackY);
+        }
     }
 }

@@ -18,6 +18,12 @@ MonoBehaviour:
   itemType: 0
   damage: 10
   defense: 10
-  health: 10
+  health: 100
+  canUse: 1
+  consumeOnUse: 1
+  useEffectType: 1
+  useValue: 30
+  isTemporaryBuff: 1
+  buffDuration: 20
   stackable: 1
   maxStack: 5

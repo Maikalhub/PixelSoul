@@ -4,10 +4,22 @@ using TMPro;
 public class CoinSystem : MonoBehaviour
 {
     public static CoinSystem Instance;
-    private void Awake() => Instance = this;
 
-    public int CurrentCoins = 1; // Начальное количество
+    [Header("Coins")]
+    public int CurrentCoins = 1;
+
+    [Header("UI")]
     public TMP_Text coinText;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
+
+    private void Start()
+    {
+        UpdateUI(); // сразу показать текущее количество при запуске
+    }
 
     public void AddCoins(int amount)
     {
@@ -20,14 +32,22 @@ public class CoinSystem : MonoBehaviour
         if (CurrentCoins >= amount)
         {
             CurrentCoins -= amount;
+            UpdateUI(); // обновляем текст после траты
             return true;
         }
+
         return false;
     }
 
     public void UpdateUI()
     {
         if (coinText != null)
-            coinText.text = $"{CurrentCoins}";
+        {
+            coinText.text = CurrentCoins.ToString();
+        }
+        else
+        {
+            Debug.LogWarning("CoinSystem: coinText не назначен в Inspector.");
+        }
     }
 }

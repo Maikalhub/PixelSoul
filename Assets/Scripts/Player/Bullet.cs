@@ -2,8 +2,12 @@ using UnityEngine;
 
 public class Bullet : MonoBehaviour
 {
+    [Header("Damage")]
+    public float damage = 10f;
+    public bool applyStun = false;
+
     [Header("Collision Settings")]
-    public LayerMask destroyOnLayers;  // слои, при столкновении с которыми пул€ умирает
+    public LayerMask destroyOnLayers;
 
     private Animator animator;
     private Rigidbody2D rb;
@@ -20,36 +24,54 @@ public class Bullet : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        // если уже умираем Ч игнор
         if (isDead) return;
 
-        // проверка сло€
+        // ”рон врагу по тегу Enemy
+        if (collision.CompareTag("Enemy"))
+        {
+            EnemyAI enemy = collision.GetComponent<EnemyAI>();
+
+            if (enemy == null)
+                enemy = collision.GetComponentInParent<EnemyAI>();
+
+            if (enemy != null)
+            {
+                enemy.TakeDamageMethod(damage, applyStun);
+                Die();
+                return;
+            }
+        }
+
+        // ”ничтожение о другие слои
         if (((1 << collision.gameObject.layer) & destroyOnLayers) != 0)
         {
-            isDead = true;
-
-            // останавливаем пулю
-            if (rb != null)
-                rb.linearVelocity = Vector2.zero;
-
-            // отключаем коллайдер
-            if (col != null)
-                col.enabled = false;
-
-            // запускаем анимацию смерти
-            if (animator != null)
-                animator.SetTrigger("Death");
-
-            Destroy(gameObject, 0.5f);
-
-
-            // если вдруг нет анимации Ч подстраховка
-            if (animator == null)
-                Destroy(gameObject, 0.5f);
+            Die();
         }
     }
 
-    // ?? вызываетс€ из Animation Event в конце Death анимации
+    private void Die()
+    {
+        if (isDead) return;
+        isDead = true;
+
+        if (rb != null)
+            rb.linearVelocity = Vector2.zero;
+
+        if (col != null)
+            col.enabled = false;
+
+        if (animator != null)
+        {
+            animator.SetTrigger("Death");
+            Destroy(gameObject, 0.5f);
+        }
+        else
+        {
+            Destroy(gameObject, 0.5f);
+        }
+    }
+
+    // ¬ызываетс€ из Animation Event в анимации Death
     public void DestroySelf()
     {
         Destroy(gameObject);

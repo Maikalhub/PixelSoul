@@ -7,7 +7,7 @@ public class EnemyBullet : MonoBehaviour
 
     private void Start()
     {
-       // Destroy(gameObject, lifeTime);
+        Destroy(gameObject, lifeTime);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -19,6 +19,7 @@ public class EnemyBullet : MonoBehaviour
                 player.TakeDamage(damage);
 
             Destroy(gameObject);
+            return;
         }
 
         if (!other.isTrigger)
