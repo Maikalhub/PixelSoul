@@ -11,25 +11,33 @@ public class LayoutStep
 
 public class InventoryUI : MonoBehaviour
 {
+    [Header("Slots")]
     public GameObject slotPrefab;
     public Transform slotParent;
+
+    [Header("Layout")]
     public LayoutStep[] layoutSteps;
 
     private GridLayoutGroup grid;
     private bool initialized = false;
 
-    void Awake()
+    private void Awake()
     {
         Init();
     }
 
-    void OnEnable()
+    private void OnEnable()
     {
         Init();
         Refresh();
     }
 
-    void Init()
+    private void OnDisable()
+    {
+        HideTooltip();
+    }
+
+    private void Init()
     {
         if (initialized) return;
 
@@ -55,8 +63,12 @@ public class InventoryUI : MonoBehaviour
         if (!initialized || Inventory.Instance == null)
             return;
 
+        HideTooltip();
+
         foreach (Transform child in slotParent)
+        {
             Destroy(child.gameObject);
+        }
 
         int count = Inventory.Instance.items.Count;
 
@@ -65,17 +77,26 @@ public class InventoryUI : MonoBehaviour
         foreach (InventorySlot slot in Inventory.Instance.items)
         {
             GameObject obj = Instantiate(slotPrefab, slotParent);
+
             UISlot uiSlot = obj.GetComponent<UISlot>();
-            uiSlot.Setup(slot);
+
+            if (uiSlot != null)
+            {
+                uiSlot.Setup(slot);
+            }
+            else
+            {
+                Debug.LogError("На slotPrefab нет компонента UISlot!");
+            }
         }
     }
 
-    void UpdateLayout(int itemCount)
+    private void UpdateLayout(int itemCount)
     {
         if (layoutSteps == null || layoutSteps.Length == 0)
             return;
 
-        foreach (var step in layoutSteps)
+        foreach (LayoutStep step in layoutSteps)
         {
             if (itemCount <= step.maxItems)
             {
@@ -86,8 +107,24 @@ public class InventoryUI : MonoBehaviour
             }
         }
 
-        var last = layoutSteps[layoutSteps.Length - 1];
+        LayoutStep last = layoutSteps[layoutSteps.Length - 1];
+
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = last.columns;
         grid.cellSize = last.cellSize;
+    }
+
+    public void CloseInventory()
+    {
+        HideTooltip();
+        gameObject.SetActive(false);
+    }
+
+    private void HideTooltip()
+    {
+        if (TooltipUI.Instance != null)
+        {
+            TooltipUI.Instance.Hide();
+        }
     }
 }

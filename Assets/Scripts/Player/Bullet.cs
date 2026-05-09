@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Bullet : MonoBehaviour
@@ -9,11 +10,17 @@ public class Bullet : MonoBehaviour
     [Header("Collision Settings")]
     public LayerMask destroyOnLayers;
 
+    [Header("Splash Damage")]
+    [SerializeField] private bool splashEnabled = false;
+    [SerializeField] private float splashDamage = 0f;
+    [SerializeField] private float splashRadius = 0f;
+
     private Animator animator;
     private Rigidbody2D rb;
     private Collider2D col;
 
     private bool isDead = false;
+    private bool splashTriggered = false;
 
     private void Start()
     {
@@ -22,11 +29,18 @@ public class Bullet : MonoBehaviour
         col = GetComponent<Collider2D>();
     }
 
+    public void SetupSkillEffects(bool enableSplash, float radiusDamage, float radius)
+    {
+        splashEnabled = enableSplash;
+        splashDamage = radiusDamage;
+        splashRadius = radius;
+    }
+
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (isDead) return;
+        if (isDead)
+            return;
 
-        // Урон врагу по тегу Enemy
         if (collision.CompareTag("Enemy"))
         {
             EnemyAI enemy = collision.GetComponent<EnemyAI>();
@@ -37,15 +51,50 @@ public class Bullet : MonoBehaviour
             if (enemy != null)
             {
                 enemy.TakeDamageMethod(damage, applyStun);
+                ApplySplashDamage(enemy);
                 Die();
                 return;
             }
         }
 
-        // Уничтожение о другие слои
         if (((1 << collision.gameObject.layer) & destroyOnLayers) != 0)
         {
+            ApplySplashDamage(null);
             Die();
+        }
+    }
+
+    private void ApplySplashDamage(EnemyAI mainTarget)
+    {
+        if (splashTriggered || !splashEnabled || splashRadius <= 0f || splashDamage <= 0f)
+            return;
+
+        splashTriggered = true;
+
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, splashRadius);
+        HashSet<EnemyAI> damagedEnemies = new HashSet<EnemyAI>();
+
+        foreach (Collider2D hit in hits)
+        {
+            if (hit == null)
+                continue;
+
+            EnemyAI enemy = hit.GetComponent<EnemyAI>();
+
+            if (enemy == null)
+                enemy = hit.GetComponentInParent<EnemyAI>();
+
+            if (enemy == null)
+                continue;
+
+            if (enemy == mainTarget)
+                continue;
+
+            if (damagedEnemies.Contains(enemy))
+                continue;
+
+            damagedEnemies.Add(enemy);
+            enemy.TakeDamageMethod(splashDamage, false);
         }
     }
 
@@ -71,9 +120,17 @@ public class Bullet : MonoBehaviour
         }
     }
 
-    // Вызывается из Animation Event в анимации Death
     public void DestroySelf()
     {
         Destroy(gameObject);
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!splashEnabled || splashRadius <= 0f)
+            return;
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, splashRadius);
     }
 }

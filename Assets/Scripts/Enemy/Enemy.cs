@@ -9,6 +9,7 @@ public class EnemyAI : MonoBehaviour
     public enum AIState { Patrolling, Chasing, Attacking, Evading, Idle, Alert, Retreating, Fleeing }
     public enum MovementMode { GroundOnly, SmartJump, JumpOnly }
     public enum AttackType { Standard, Charge, Ranged }
+    public enum PatrolRouteMode { Loop, PingPong }
 
     [Header("AI Configuration")]
     public AIState currentState = AIState.Patrolling;
@@ -67,6 +68,15 @@ public class EnemyAI : MonoBehaviour
     [Header("Patrol Points")]
     public Transform[] patrolPoints;
 
+    [Header("Patrol Tuning")]
+    public PatrolRouteMode patrolRouteMode = PatrolRouteMode.Loop;
+    public float patrolStopDistance = 0.2f;
+    public float patrolSlowdownDistance = 1.25f;
+    [Range(0.05f, 1f)] public float patrolMinSpeedPercent = 0.25f;
+    public bool patrolWaitAtPoint = true;
+    public float patrolWaitTime = 1f;
+    public bool patrolFlipToNextPointWhileWaiting = true;
+
     [Header("Platform AI")]
     public LayerMask groundLayer;
     public Transform groundCheck;
@@ -117,6 +127,10 @@ public class EnemyAI : MonoBehaviour
     private Color currentVisualColor;
 
     private int currentPatrolIndex;
+    private int patrolStepDirection = 1;
+    private bool isWaitingOnPatrolPoint;
+    private float patrolWaitTimer;
+
     private float lastAttackTime = -999f;
     private float lastJumpTime = -999f;
     private float lastSeenTime = -999f;
@@ -159,6 +173,9 @@ public class EnemyAI : MonoBehaviour
             meleeHitbox = GetComponentInChildren<EnemyAttack>();
 
         currentPatrolIndex = 0;
+        patrolStepDirection = 1;
+        isWaitingOnPatrolPoint = false;
+        patrolWaitTimer = 0f;
     }
 
     private void Update()
@@ -360,24 +377,137 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
+        if (HandlePatrolWaiting())
+            return;
+
         Transform targetPoint = patrolPoints[currentPatrolIndex];
         if (targetPoint == null)
         {
-            currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
+            AdvancePatrolIndex();
             IdleBehavior();
             return;
         }
 
         float xDiff = targetPoint.position.x - transform.position.x;
+        float distanceToPoint = Mathf.Abs(xDiff);
 
-        if (Mathf.Abs(xDiff) <= 0.2f)
+        if (distanceToPoint <= patrolStopDistance)
         {
-            currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
-            IdleBehavior();
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+
+            if (patrolWaitAtPoint && patrolWaitTime > 0f)
+            {
+                if (patrolFlipToNextPointWhileWaiting)
+                    FaceNextPatrolPoint();
+
+                AdvancePatrolIndex();
+                StartPatrolWait();
+                return;
+            }
+
+            AdvancePatrolIndex();
             return;
         }
 
-        MoveInDirection(Mathf.Sign(xDiff), patrolSpeed);
+        float currentPatrolMoveSpeed = GetPatrolMoveSpeed(distanceToPoint);
+        MoveInDirection(xDiff, currentPatrolMoveSpeed);
+    }
+
+    private bool HandlePatrolWaiting()
+    {
+        if (!isWaitingOnPatrolPoint)
+            return false;
+
+        patrolWaitTimer -= Time.fixedDeltaTime;
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+
+        if (patrolWaitTimer <= 0f)
+        {
+            patrolWaitTimer = 0f;
+            isWaitingOnPatrolPoint = false;
+        }
+
+        return true;
+    }
+
+    private void StartPatrolWait()
+    {
+        isWaitingOnPatrolPoint = true;
+        patrolWaitTimer = patrolWaitTime;
+    }
+
+    private float GetPatrolMoveSpeed(float distanceToPoint)
+    {
+        if (patrolSlowdownDistance <= patrolStopDistance)
+            return patrolSpeed;
+
+        if (distanceToPoint >= patrolSlowdownDistance)
+            return patrolSpeed;
+
+        float t = Mathf.InverseLerp(patrolStopDistance, patrolSlowdownDistance, distanceToPoint);
+        float speedPercent = Mathf.Lerp(patrolMinSpeedPercent, 1f, t);
+        return patrolSpeed * speedPercent;
+    }
+
+    private void AdvancePatrolIndex()
+    {
+        if (patrolPoints == null || patrolPoints.Length <= 1)
+            return;
+
+        if (patrolRouteMode == PatrolRouteMode.Loop)
+        {
+            currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
+            return;
+        }
+
+        currentPatrolIndex += patrolStepDirection;
+
+        if (currentPatrolIndex >= patrolPoints.Length)
+        {
+            patrolStepDirection = -1;
+            currentPatrolIndex = patrolPoints.Length - 2;
+        }
+        else if (currentPatrolIndex < 0)
+        {
+            patrolStepDirection = 1;
+            currentPatrolIndex = 1;
+        }
+
+        currentPatrolIndex = Mathf.Clamp(currentPatrolIndex, 0, patrolPoints.Length - 1);
+    }
+
+    private int GetNextPatrolIndexPreview()
+    {
+        if (patrolPoints == null || patrolPoints.Length <= 1)
+            return currentPatrolIndex;
+
+        if (patrolRouteMode == PatrolRouteMode.Loop)
+            return (currentPatrolIndex + 1) % patrolPoints.Length;
+
+        int nextIndex = currentPatrolIndex + patrolStepDirection;
+
+        if (nextIndex >= patrolPoints.Length)
+            nextIndex = patrolPoints.Length - 2;
+        else if (nextIndex < 0)
+            nextIndex = 1;
+
+        return Mathf.Clamp(nextIndex, 0, patrolPoints.Length - 1);
+    }
+
+    private void FaceNextPatrolPoint()
+    {
+        int nextIndex = GetNextPatrolIndexPreview();
+
+        if (patrolPoints == null || nextIndex < 0 || nextIndex >= patrolPoints.Length)
+            return;
+
+        Transform nextPoint = patrolPoints[nextIndex];
+        if (nextPoint == null)
+            return;
+
+        float dir = nextPoint.position.x - transform.position.x;
+        if (Mathf.Abs(dir) > 0.01f)
+            FaceDirection(dir);
     }
 
     private void ChaseBehavior()
@@ -397,7 +527,7 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
-        MoveInDirection(Mathf.Sign(xDiff), chaseSpeed);
+        MoveInDirection(xDiff, chaseSpeed);
     }
 
     private void AttackBehavior()
@@ -588,21 +718,27 @@ public class EnemyAI : MonoBehaviour
 
     private void MoveInDirection(float dir, float speed)
     {
-        dir = Mathf.Sign(dir);
-
-        if (Mathf.Approximately(dir, 0f))
+        if (Mathf.Abs(dir) <= 0.01f)
         {
             IdleBehavior();
             return;
         }
 
+        dir = Mathf.Sign(dir);
         FaceDirection(dir);
+
+        bool grounded = IsGrounded();
+        bool groundAhead = IsGroundAhead();
+        bool wallAhead = IsWallAhead();
 
         switch (movementMode)
         {
             case MovementMode.GroundOnly:
-                if (IsGrounded() && (!IsGroundAhead() || IsWallAhead()))
+                if (grounded && (!groundAhead || wallAhead))
                 {
+                    if (currentState == AIState.Patrolling && HasPatrolRoute())
+                        AdvancePatrolIndex();
+
                     rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
                     return;
                 }
@@ -611,7 +747,7 @@ public class EnemyAI : MonoBehaviour
                 break;
 
             case MovementMode.SmartJump:
-                if (IsGrounded() && (!IsGroundAhead() || IsWallAhead()))
+                if (grounded && (!groundAhead || wallAhead))
                 {
                     TryJump(dir);
                     return;
@@ -621,7 +757,7 @@ public class EnemyAI : MonoBehaviour
                 break;
 
             case MovementMode.JumpOnly:
-                if (IsGrounded())
+                if (grounded)
                     TryJump(dir);
                 break;
         }

@@ -24,6 +24,9 @@ public class PlayerMovement : MonoBehaviour
     [Header("Flashlight")]
     public FlashlightController flashlight;
 
+    [Header("Skills")]
+    public SkillEffectApplier skillEffects;
+
     private bool isFacingRight = true;
     private bool wasGrounded;
 
@@ -226,7 +229,12 @@ public class PlayerMovement : MonoBehaviour
 
         if (flashlight == null)
         {
-            flashlight = GetComponentInChildren<FlashlightController>();
+            flashlight = GetComponentInChildren<FlashlightController>(true);
+        }
+
+        if (skillEffects == null)
+        {
+            skillEffects = GetComponent<SkillEffectApplier>();
         }
     }
 
@@ -438,24 +446,44 @@ public class PlayerMovement : MonoBehaviour
 
     public void Throw(InputAction.CallbackContext context)
     {
-        if (context.performed && !isDead)
-        {
-            if (!TrySpendStamina(throwStaminaCost))
-            {
-                Debug.Log("Недостаточно стамины для броска!");
-                return;
-            }
+        if (!context.performed || isDead)
+            return;
 
-            animator.SetTrigger("Throw");
-            PlayRandomClip(throwClips);
-            Throw();
+        if (skillEffects == null || !skillEffects.CanShoot)
+        {
+            Debug.Log("Стрельба ещё не разблокирована навыком.");
+            return;
         }
+
+        if (!TrySpendStamina(throwStaminaCost))
+        {
+            Debug.Log("Недостаточно стамины для броска!");
+            return;
+        }
+
+        animator.SetTrigger("Throw");
+        PlayRandomClip(throwClips);
+        Throw();
     }
 
     public void ToggleFlashlight(InputAction.CallbackContext context)
     {
-        if (context.performed)
-            flashlight?.ToggleLight();
+        if (!context.performed || isDead)
+            return;
+
+        if (skillEffects == null)
+            skillEffects = GetComponent<SkillEffectApplier>();
+
+        if (flashlight == null && skillEffects != null)
+            flashlight = skillEffects.Flashlight;
+
+        if (flashlight == null || !flashlight.IsUnlocked)
+        {
+            Debug.Log("Фонарь ещё не разблокирован навыком.");
+            return;
+        }
+
+        flashlight.ToggleLight();
     }
 
     public void DropFromPlatform(InputAction.CallbackContext context)
@@ -832,9 +860,39 @@ public class PlayerMovement : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
+        float hitDirection = isFacingRight ? -1f : 1f;
+        ApplyDamage(damage, hitDirection, hitKnockbackX, hitKnockbackY);
+    }
+
+    public void TakeDamage(int damage, Vector2 hitSourcePosition)
+    {
+        float hitDirection = transform.position.x < hitSourcePosition.x ? -1f : 1f;
+        ApplyDamage(damage, hitDirection, hitKnockbackX, hitKnockbackY);
+    }
+
+    public void TakeDamage(int damage, Vector2 hitSourcePosition, float customKnockbackX, float customKnockbackY)
+    {
+        float hitDirection = transform.position.x < hitSourcePosition.x ? -1f : 1f;
+        ApplyDamage(damage, hitDirection, customKnockbackX, customKnockbackY);
+    }
+
+    private void ApplyDamage(int damage, float hitDirection, float knockbackX, float knockbackY)
+    {
         if (isDead || isInvulnerable) return;
 
         int finalDamage = Mathf.Max(damage - defenseStat, 1);
+
+        if (skillEffects != null)
+        {
+            finalDamage = skillEffects.AbsorbDamage(finalDamage);
+
+            if (finalDamage <= 0)
+            {
+                Debug.Log("Урон полностью поглощён щитом.");
+                return;
+            }
+        }
+
         currentHealth -= finalDamage;
         currentHealth = Mathf.Max(currentHealth, 0);
 
@@ -850,11 +908,19 @@ public class PlayerMovement : MonoBehaviour
         animator.SetTrigger("Hit");
         PlayRandomClip(hitClips);
 
-        float hitDirection = isFacingRight ? -1f : 1f;
-        rb.linearVelocity = new Vector2(hitDirection * hitKnockbackX, hitKnockbackY);
+        rb.linearVelocity = new Vector2(hitDirection * knockbackX, knockbackY);
 
         if (lethal)
         {
+            if (skillEffects != null && skillEffects.TryUseRevive())
+            {
+                currentHealth = Mathf.Max(1, Mathf.RoundToInt(maxHealth * 0.35f));
+                currentStamina = Mathf.Max(currentStamina, maxStamina * 0.35f);
+                Debug.Log("Сработало воскрешение.");
+                StartCoroutine(DamageInvulnerabilityRoutine());
+                return;
+            }
+
             Die();
             return;
         }
@@ -907,23 +973,68 @@ public class PlayerMovement : MonoBehaviour
         Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         mouseWorldPos.z = 0f;
 
-        Vector2 direction = (mouseWorldPos - firePoint.position).normalized;
+        Vector2 baseDirection = (mouseWorldPos - firePoint.position).normalized;
 
-        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+        int projectileCount = 1;
+        float spreadStep = 0f;
 
-        Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
-        if (bulletRb != null)
-            bulletRb.linearVelocity = direction * throwForce;
+        if (skillEffects != null)
+        {
+            projectileCount += Mathf.Max(skillEffects.ExtraProjectiles, 0);
+            spreadStep = skillEffects.ProjectileSpreadAngle;
+        }
 
-        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        bullet.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+        for (int i = 0; i < projectileCount; i++)
+        {
+            float angleOffset = 0f;
 
-        Bullet bulletScript = bullet.GetComponent<Bullet>();
-        if (bulletScript != null)
-            bulletScript.destroyOnLayers = destroyLayers;
+            if (projectileCount > 1)
+            {
+                float centerOffset = (projectileCount - 1) * 0.5f;
+                angleOffset = (i - centerOffset) * spreadStep;
+            }
+
+            Vector2 direction = RotateVector(baseDirection, angleOffset);
+
+            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+
+            Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
+            if (bulletRb != null)
+                bulletRb.linearVelocity = direction * throwForce;
+
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            bullet.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+
+            Bullet bulletScript = bullet.GetComponent<Bullet>();
+            if (bulletScript != null)
+            {
+                bulletScript.destroyOnLayers = destroyLayers;
+
+                if (skillEffects != null)
+                {
+                    bulletScript.SetupSkillEffects(
+                        skillEffects.BulletSplashEnabled,
+                        skillEffects.BulletSplashDamage,
+                        skillEffects.BulletSplashRadius
+                    );
+                }
+            }
+        }
 
         canThrow = false;
         StartCoroutine(ResetThrowCooldown());
+    }
+
+    private Vector2 RotateVector(Vector2 v, float degrees)
+    {
+        float radians = degrees * Mathf.Deg2Rad;
+        float sin = Mathf.Sin(radians);
+        float cos = Mathf.Cos(radians);
+
+        float x = v.x * cos - v.y * sin;
+        float y = v.x * sin + v.y * cos;
+
+        return new Vector2(x, y).normalized;
     }
 
     private IEnumerator ResetThrowCooldown()

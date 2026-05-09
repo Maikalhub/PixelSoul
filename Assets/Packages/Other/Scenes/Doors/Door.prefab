@@ -125,7 +125,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DoorTrigger
   playerTag: Player
   targetLevelIndex: 0
-  requireAllKeys: 1
+  requireAllKeys: 0
   customSpawnPoint: {fileID: 0}
 --- !u!1 &1765301883970840570
 GameObject:

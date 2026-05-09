@@ -18,25 +18,23 @@ public class CoinSystem : MonoBehaviour
 
     private void Start()
     {
-        UpdateUI(); // сразу показать текущее количество при запуске
+        RefreshAllUI();
     }
 
     public void AddCoins(int amount)
     {
         CurrentCoins += amount;
-        UpdateUI();
+        RefreshAllUI();
     }
 
     public bool SpendCoins(int amount)
     {
-        if (CurrentCoins >= amount)
-        {
-            CurrentCoins -= amount;
-            UpdateUI(); // обновляем текст после траты
-            return true;
-        }
+        if (CurrentCoins < amount)
+            return false;
 
-        return false;
+        CurrentCoins -= amount;
+        RefreshAllUI();
+        return true;
     }
 
     public void UpdateUI()
@@ -48,6 +46,16 @@ public class CoinSystem : MonoBehaviour
         else
         {
             Debug.LogWarning("CoinSystem: coinText не назначен в Inspector.");
+        }
+    }
+
+    private void RefreshAllUI()
+    {
+        UpdateUI();
+
+        if (SkillTree.skillTree != null)
+        {
+            SkillTree.skillTree.UpdateAllSkillUI();
         }
     }
 }

@@ -30,10 +30,7 @@ public class LevelManager : MonoBehaviour
         public GameObject[] objectsToEnableOnEnter;
 
         [Header("Audio")]
-        [Tooltip("Массив фоновых треков для этого уровня")]
         public AudioClip[] backgroundMusicClips;
-
-        [Tooltip("Случайные ambient-звуки: скрип, ветер, капли, стук и т.д.")]
         public AudioClip[] randomAmbientClips;
 
         [Tooltip("Минимальная и максимальная задержка между случайными звуками")]
@@ -55,6 +52,8 @@ public class LevelManager : MonoBehaviour
 
     [Header("Стартовые настройки")]
     [SerializeField] private int startLevelIndex = 0;
+
+    [Tooltip("Запасной Confiner. Используется только если у текущего уровня не назначен levelConfinerShape.")]
     [SerializeField] private Collider2D firstConfinerShape;
 
     [Header("Все уровни по порядку")]
@@ -70,12 +69,26 @@ public class LevelManager : MonoBehaviour
     [SerializeField] private Color defaultKeyColor = Color.gray;
     [SerializeField] private Color collectedKeyColor = Color.white;
 
+    [Header("UI названия уровня")]
+    [SerializeField] private GameObject levelTitleRoot;
+    [SerializeField] private TypewriterTextUI levelTitleTypewriter;
+
+    [Tooltip("{0} заменится на имя текущего уровня")]
+    [SerializeField] private string levelTitleFormat = "Уровень: {0}";
+
     [Header("Fade")]
     [SerializeField] private Image fadeImage;
+
+    [Tooltip("Скорость затемнения и проявления экрана")]
     [SerializeField] private float fadeDuration = 0.35f;
+
+    [Tooltip("Сколько секунд экран остается черным после переноса игрока на новый уровень")]
+    [SerializeField] private float blackScreenHoldDuration = 0.5f;
 
     private readonly List<Image> spawnedKeyIcons = new();
     private readonly HashSet<int> completedLevels = new();
+
+    private Rigidbody2D playerRb;
 
     private int currentLevelIndex;
     private int collectedKeys;
@@ -114,19 +127,22 @@ public class LevelManager : MonoBehaviour
             return;
         }
 
+        playerRb = player.GetComponent<Rigidbody2D>();
+
         currentLevelIndex = Mathf.Clamp(startLevelIndex, 0, levels.Length - 1);
         collectedKeys = 0;
 
-        ApplyFirstConfiner();
-        ApplyLevelData(false);
-
         if (fadeImage != null)
         {
+            fadeImage.gameObject.SetActive(true);
+
             Color c = fadeImage.color;
             c.a = 0f;
             fadeImage.color = c;
-            fadeImage.gameObject.SetActive(true);
         }
+
+        ApplyLevelData(true);
+        ShowCurrentLevelTitle();
     }
 
     public void CollectKey(GameObject keyObject)
@@ -160,13 +176,11 @@ public class LevelManager : MonoBehaviour
             return;
         }
 
-        // Если дверь требует все ключи, считаем текущий уровень пройденным
         if (requireAllKeys)
         {
             MarkLevelCompleted(currentLevelIndex);
         }
 
-        // Проверяем, открыт ли целевой уровень
         if (!IsLevelUnlocked(targetLevelIndex))
         {
             Debug.Log(
@@ -188,21 +202,14 @@ public class LevelManager : MonoBehaviour
         currentLevelIndex = targetLevelIndex;
         ApplyLevelData(true, customSpawnPoint);
 
-        yield return null;
+        if (blackScreenHoldDuration > 0f)
+            yield return new WaitForSecondsRealtime(blackScreenHoldDuration);
 
         yield return FadeImageAlpha(0f);
 
+        ShowCurrentLevelTitle();
+
         isTransitioning = false;
-    }
-
-    private void ApplyFirstConfiner()
-    {
-        if (confiner2D == null || firstConfinerShape == null)
-            return;
-
-        confiner2D.BoundingShape2D = firstConfinerShape;
-        confiner2D.InvalidateBoundingShapeCache();
-        confiner2D.InvalidateLensCache();
     }
 
     private void ApplyLevelData(bool movePlayerToSpawn, Transform customSpawnPoint = null)
@@ -211,22 +218,86 @@ public class LevelManager : MonoBehaviour
 
         if (movePlayerToSpawn)
         {
-            if (customSpawnPoint != null)
-                player.position = customSpawnPoint.position;
-            else if (level.spawnPoint != null)
-                player.position = level.spawnPoint.position;
+            Transform targetSpawn = customSpawnPoint != null ? customSpawnPoint : level.spawnPoint;
+
+            if (targetSpawn != null)
+            {
+                MovePlayerToPosition(targetSpawn.position);
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"LevelManager: у уровня \"{level.levelName}\" не назначен spawnPoint."
+                );
+            }
         }
 
-        if (confiner2D != null && level.levelConfinerShape != null)
-        {
-            confiner2D.BoundingShape2D = level.levelConfinerShape;
-            confiner2D.InvalidateBoundingShapeCache();
-            confiner2D.InvalidateLensCache();
-        }
-
+        ApplyConfiner(level);
         ApplyObjectsState(level);
         SetupCurrentLevelUIOnly();
         ApplyAudioForCurrentLevel();
+    }
+
+    private void ShowCurrentLevelTitle()
+    {
+        if (levelTitleRoot != null)
+            levelTitleRoot.SetActive(true);
+
+        if (levelTitleTypewriter == null && levelTitleRoot != null)
+            levelTitleTypewriter = levelTitleRoot.GetComponentInChildren<TypewriterTextUI>(true);
+
+        if (levelTitleTypewriter == null)
+        {
+            Debug.LogWarning("LevelManager: не назначен levelTitleTypewriter.");
+            return;
+        }
+
+        string levelName = string.IsNullOrEmpty(CurrentLevel.levelName)
+            ? $"Уровень {currentLevelIndex + 1}"
+            : CurrentLevel.levelName;
+
+        string text = string.Format(levelTitleFormat, levelName);
+
+        levelTitleTypewriter.PlayTextThenHide(text);
+    }
+
+    private void MovePlayerToPosition(Vector3 targetPosition)
+    {
+        if (playerRb != null)
+        {
+            playerRb.linearVelocity = Vector2.zero;
+            playerRb.angularVelocity = 0f;
+            playerRb.position = targetPosition;
+        }
+        else
+        {
+            player.position = targetPosition;
+        }
+    }
+
+    private void ApplyConfiner(LevelData level)
+    {
+        if (confiner2D == null)
+            return;
+
+        Collider2D targetConfiner = null;
+
+        if (level != null && level.levelConfinerShape != null)
+            targetConfiner = level.levelConfinerShape;
+        else if (firstConfinerShape != null)
+            targetConfiner = firstConfinerShape;
+
+        if (targetConfiner == null)
+        {
+            Debug.LogWarning(
+                $"LevelManager: для уровня \"{level.levelName}\" не назначен levelConfinerShape и не назначен firstConfinerShape."
+            );
+            return;
+        }
+
+        confiner2D.BoundingShape2D = targetConfiner;
+        confiner2D.InvalidateBoundingShapeCache();
+        confiner2D.InvalidateLensCache();
     }
 
     private void ApplyAudioForCurrentLevel()
@@ -327,14 +398,23 @@ public class LevelManager : MonoBehaviour
         if (fadeImage == null)
             yield break;
 
+        fadeImage.gameObject.SetActive(true);
+
         Color color = fadeImage.color;
         float startAlpha = color.a;
         float elapsed = 0f;
 
+        if (fadeDuration <= 0f)
+        {
+            color.a = targetAlpha;
+            fadeImage.color = color;
+            yield break;
+        }
+
         while (elapsed < fadeDuration)
         {
-            elapsed += Time.deltaTime;
-            float t = fadeDuration <= 0f ? 1f : Mathf.Clamp01(elapsed / fadeDuration);
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / fadeDuration);
 
             color.a = Mathf.Lerp(startAlpha, targetAlpha, t);
             fadeImage.color = color;

@@ -13,17 +13,26 @@ public class Skill : MonoBehaviour
     public TMP_Text costText;
 
     [Header("Assigned References")]
-    public Image iconImage;     // сюда назначаешь любой Image, в том числе дочерний
-    public Button skillButton;  // сюда тоже можно назначить кнопку вручную
+    public Image iconImage;
+    public Button skillButton;
+
+    [Header("Runtime References")]
+    [SerializeField] private SkillEffectApplier skillEffectApplier;
+    [SerializeField] private SkillResearchRadialPanelUI researchRadialPanelUI;
 
     private void Awake()
     {
-        // Если не назначил вручную — попробуем взять с текущего объекта
         if (iconImage == null)
             iconImage = GetComponent<Image>();
 
         if (skillButton == null)
             skillButton = GetComponent<Button>();
+
+        if (skillEffectApplier == null)
+            skillEffectApplier = FindObjectOfType<SkillEffectApplier>();
+
+        if (researchRadialPanelUI == null)
+            researchRadialPanelUI = FindObjectOfType<SkillResearchRadialPanelUI>();
 
         if (skillButton != null)
             skillButton.onClick.AddListener(Buy);
@@ -33,6 +42,9 @@ public class Skill : MonoBehaviour
 
     public void CheckDependencies()
     {
+        if (skillSO == null)
+            return;
+
         if (skillSO.permanentlyLocked)
         {
             skillSO.canBeUnlocked = false;
@@ -51,6 +63,9 @@ public class Skill : MonoBehaviour
 
             foreach (SkillSO previousSkill in skillSO.requiredSkills)
             {
+                if (previousSkill == null)
+                    continue;
+
                 if (previousSkill.isLocked)
                 {
                     canBeUnlocked = false;
@@ -66,6 +81,9 @@ public class Skill : MonoBehaviour
 
             foreach (SkillSO previousSkill in skillSO.requiredSkills)
             {
+                if (previousSkill == null)
+                    continue;
+
                 if (!previousSkill.isLocked)
                 {
                     canBeUnlocked = true;
@@ -79,6 +97,9 @@ public class Skill : MonoBehaviour
 
     public void UpdateUI()
     {
+        if (skillSO == null)
+            return;
+
         if (lockStatusText != null)
         {
             lockStatusText.text = !skillSO.isLocked ? "Unlocked" :
@@ -86,18 +107,18 @@ public class Skill : MonoBehaviour
         }
 
         if (titleText != null)
-            titleText.text = skillSO.name;
+        {
+            titleText.text = !string.IsNullOrWhiteSpace(skillSO.skillName)
+                ? skillSO.skillName
+                : skillSO.name;
+        }
 
         if (costText != null)
             costText.text = $"{skillSO.cost} coins";
 
-        // Иконка навыка
         if (iconImage != null && skillSO.skillIcon != null)
-        {
             iconImage.sprite = skillSO.skillIcon;
-        }
 
-        // Цвет иконки/объекта изображения
         if (iconImage != null)
         {
             if (skillSO.permanentlyLocked)
@@ -110,26 +131,62 @@ public class Skill : MonoBehaviour
                 iconImage.color = Color.white;
         }
 
-        // Доступность кнопки
         if (skillButton != null)
         {
-            skillButton.interactable = skillSO.canBeUnlocked &&
-                                       skillSO.isLocked &&
-                                       !skillSO.permanentlyLocked &&
-                                       CoinSystem.Instance.CurrentCoins >= skillSO.cost;
+            bool hasEnoughCoins = CoinSystem.Instance != null &&
+                                  CoinSystem.Instance.CurrentCoins >= skillSO.cost;
+
+            skillButton.interactable =
+                skillSO.canBeUnlocked &&
+                skillSO.isLocked &&
+                !skillSO.permanentlyLocked &&
+                hasEnoughCoins;
         }
     }
 
     public void Buy()
     {
+        if (skillSO == null)
+            return;
+
         if (!skillSO.canBeUnlocked || !skillSO.isLocked || skillSO.permanentlyLocked)
             return;
 
-        if (CoinSystem.Instance.SpendCoins(skillSO.cost))
+        if (CoinSystem.Instance == null)
         {
-            skillSO.Unlock();
-            SkillTree.skillTree.UpdateAllSkillUI();
-            CoinSystem.Instance.UpdateUI();
+            Debug.LogWarning("CoinSystem.Instance не найден.");
+            return;
         }
+
+        if (!CoinSystem.Instance.SpendCoins(skillSO.cost))
+            return;
+
+        skillSO.Unlock();
+
+        if (skillEffectApplier == null)
+            skillEffectApplier = FindObjectOfType<SkillEffectApplier>();
+
+        if (skillEffectApplier != null)
+        {
+            skillEffectApplier.ApplySkill(skillSO);
+        }
+        else
+        {
+            Debug.LogWarning($"Skill {skillSO.name}: SkillEffectApplier не найден на сцене.");
+        }
+
+        if (researchRadialPanelUI == null)
+            researchRadialPanelUI = FindObjectOfType<SkillResearchRadialPanelUI>();
+
+        if (researchRadialPanelUI != null)
+            researchRadialPanelUI.ShowSkill(skillSO);
+        else
+            Debug.LogWarning("SkillResearchRadialPanelUI не найден на сцене.");
+
+        if (SkillTree.skillTree != null)
+            SkillTree.skillTree.UpdateAllSkillUI();
+
+        if (CoinSystem.Instance != null)
+            CoinSystem.Instance.UpdateUI();
     }
 }

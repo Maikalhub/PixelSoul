@@ -56,9 +56,9 @@ MonoBehaviour:
     - line: '|   accelerometerFrequency: 60'
     - line: '|   companyName: TMA'
     - line: '|   productName: PixelSoul'
-    - line: '|   defaultCursor: {fileID: 2800000, guid: 11c955c403c0dd04a98b4b5933569e7a,
+    - line: '|   defaultCursor: {fileID: 2800000, guid: 37a9e6bcb88e370478f3544168ccb7de,
         type: 3}'
-    - line: '|   cursorHotspot: {x: 3, y: 3}'
+    - line: '|   cursorHotspot: {x: 1, y: 1}'
     - line: '|   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b:
         0.1254902, a: 1}'
     - line: '|   m_ShowUnitySplashScreen: 1'

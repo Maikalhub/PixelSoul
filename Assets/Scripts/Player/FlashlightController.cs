@@ -1,15 +1,18 @@
-using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
-[RequireComponent(typeof(Collider2D))]
+[DisallowMultipleComponent]
 public class FlashlightController : MonoBehaviour
 {
+    [Header("Unlock")]
+    [SerializeField] private bool startUnlocked = false;
+    [SerializeField] private GameObject visualRoot;
+
     [Header("Ability")]
-    [SerializeField] private float activeDuration = 6f;       // Максимальный заряд в секундах
-    [SerializeField] private float rechargeDuration = 8f;     // За сколько секунд зарядится с 0 до full
+    [SerializeField] private float activeDuration = 6f;
+    [SerializeField] private float rechargeDuration = 8f;
     [SerializeField] private bool startReady = true;
-    [SerializeField] private float minChargeToTurnOn = 0.05f; // Минимум заряда для включения
+    [SerializeField] private float minChargeToTurnOn = 0.05f;
 
     [Header("Light")]
     [SerializeField] private Light unityLight;
@@ -26,16 +29,18 @@ public class FlashlightController : MonoBehaviour
     [SerializeField] private float idleFlickerSpeed = 2f;
 
     private PlayerMovement playerMovement;
-    private Collider2D revealTrigger;
-    private readonly HashSet<EnemyAI> enemiesInside = new HashSet<EnemyAI>();
 
     private Component resolvedLightComponent;
     private PropertyInfo intensityProperty;
-    private float noiseSeed;
 
+    private float noiseSeed;
+    private bool initialized;
+
+    private bool isUnlocked;
     private bool isOn;
     private float currentCharge;
 
+    public bool IsUnlocked => isUnlocked;
     public bool IsOn => isOn;
     public bool IsReady => currentCharge >= activeDuration - 0.01f;
     public bool IsRecharging => currentCharge < activeDuration - 0.01f && !isOn;
@@ -46,31 +51,84 @@ public class FlashlightController : MonoBehaviour
 
     private void Awake()
     {
-        playerMovement = GetComponentInParent<PlayerMovement>();
-        revealTrigger = GetComponent<Collider2D>();
-        revealTrigger.isTrigger = true;
-
-        ResolveLightComponent();
-        noiseSeed = Random.Range(0f, 1000f);
+        Initialize();
+        SetUnlocked(startUnlocked);
     }
 
-    private void Start()
+    private void OnEnable()
     {
-        currentCharge = startReady ? activeDuration : 0f;
-        isOn = false;
-
-        SetLightIntensity(offIntensity);
-        HideAllEnemiesInside();
+        Initialize();
+        UpdateLightVisual(true);
     }
 
     private void Update()
     {
+        if (!isUnlocked)
+        {
+            if (isOn)
+                TurnOff(false);
+
+            UpdateLightVisual(false);
+            return;
+        }
+
         UpdateCharge();
-        UpdateLightVisual();
+        UpdateLightVisual(false);
+    }
+
+    private void Initialize()
+    {
+        if (initialized)
+            return;
+
+        initialized = true;
+
+        playerMovement = GetComponentInParent<PlayerMovement>();
+        ResolveLightComponent();
+
+        noiseSeed = Random.Range(0f, 1000f);
+        currentCharge = startReady ? activeDuration : 0f;
+
+        SetLightIntensity(offIntensity);
+
+        if (visualRoot != null)
+            visualRoot.SetActive(startUnlocked);
+    }
+
+    public void SetUnlocked(bool unlocked)
+    {
+        Initialize();
+
+        isUnlocked = unlocked;
+
+        if (!isUnlocked)
+        {
+            TurnOff(false);
+
+            if (visualRoot != null)
+                visualRoot.SetActive(false);
+
+            SetLightIntensity(offIntensity);
+            return;
+        }
+
+        if (visualRoot != null)
+            visualRoot.SetActive(true);
+
+        if (startReady && currentCharge <= 0f)
+            currentCharge = activeDuration;
+
+        Debug.Log("[Flashlight] Фонарь разблокирован.");
     }
 
     public void ToggleLight()
     {
+        if (!isUnlocked)
+        {
+            Debug.Log("[Flashlight] Фонарь ещё не разблокирован навыком.");
+            return;
+        }
+
         if (isOn)
         {
             TurnOff(false);
@@ -86,48 +144,12 @@ public class FlashlightController : MonoBehaviour
         TurnOn();
     }
 
-    private void UpdateCharge()
-    {
-        if (isOn)
-        {
-            currentCharge -= Time.deltaTime;
-
-            if (currentCharge <= 0f)
-            {
-                currentCharge = 0f;
-                Debug.Log("[Flashlight] Заряд закончился.");
-                TurnOff(true);
-            }
-        }
-        else
-        {
-            if (currentCharge < activeDuration)
-            {
-                float rechargeRate = rechargeDuration > 0f
-                    ? activeDuration / rechargeDuration
-                    : activeDuration;
-
-                float previousCharge = currentCharge;
-
-                currentCharge += rechargeRate * Time.deltaTime;
-                currentCharge = Mathf.Min(currentCharge, activeDuration);
-
-                if (previousCharge < activeDuration && currentCharge >= activeDuration)
-                {
-                    Debug.Log("[Flashlight] Полностью заряжен.");
-                }
-            }
-        }
-    }
-
     private void TurnOn()
     {
         if (isOn)
             return;
 
         isOn = true;
-        RevealAllEnemiesInside();
-
         Debug.Log($"[Flashlight] Включен. Заряд: {currentCharge:F1}/{activeDuration:F1}");
     }
 
@@ -137,83 +159,67 @@ public class FlashlightController : MonoBehaviour
             return;
 
         isOn = false;
-        HideAllEnemiesInside();
 
         if (autoOff)
-        {
             Debug.Log("[Flashlight] Автоматически выключен: заряд пуст.");
-        }
         else
-        {
-            Debug.Log($"[Flashlight] Выключен вручную. Остаток заряда: {currentCharge:F1}/{activeDuration:F1}");
-        }
+            Debug.Log($"[Flashlight] Выключен. Остаток заряда: {currentCharge:F1}/{activeDuration:F1}");
     }
 
-    private void OnTriggerEnter2D(Collider2D other)
+    private void UpdateCharge()
     {
-        EnemyAI enemy = other.GetComponentInParent<EnemyAI>();
-        if (enemy == null) return;
-
-        enemiesInside.Add(enemy);
-
         if (isOn)
-            enemy.SetLightVisible(true);
+        {
+            currentCharge -= Time.deltaTime;
+
+            if (currentCharge <= 0f)
+            {
+                currentCharge = 0f;
+                TurnOff(true);
+            }
+
+            return;
+        }
+
+        if (currentCharge >= activeDuration)
+            return;
+
+        float rechargeRate = rechargeDuration > 0f
+            ? activeDuration / rechargeDuration
+            : activeDuration;
+
+        currentCharge += rechargeRate * Time.deltaTime;
+        currentCharge = Mathf.Min(currentCharge, activeDuration);
     }
 
-    private void OnTriggerStay2D(Collider2D other)
-    {
-        EnemyAI enemy = other.GetComponentInParent<EnemyAI>();
-        if (enemy == null) return;
-
-        enemiesInside.Add(enemy);
-        enemy.SetLightVisible(isOn);
-    }
-
-    private void OnTriggerExit2D(Collider2D other)
-    {
-        EnemyAI enemy = other.GetComponentInParent<EnemyAI>();
-        if (enemy == null) return;
-
-        enemiesInside.Remove(enemy);
-        enemy.SetLightVisible(false);
-    }
-
-    private void RevealAllEnemiesInside()
-    {
-        enemiesInside.RemoveWhere(enemy => enemy == null);
-
-        foreach (EnemyAI enemy in enemiesInside)
-            enemy.SetLightVisible(true);
-    }
-
-    private void HideAllEnemiesInside()
-    {
-        enemiesInside.RemoveWhere(enemy => enemy == null);
-
-        foreach (EnemyAI enemy in enemiesInside)
-            enemy.SetLightVisible(false);
-    }
-
-    private void UpdateLightVisual()
+    private void UpdateLightVisual(bool instant)
     {
         if (resolvedLightComponent == null)
             return;
 
+        bool canShowLight = isUnlocked && isOn;
         bool isMoving = playerMovement != null && playerMovement.IsActuallyMoving;
 
         float flickerAmount = isMoving ? movingFlickerAmount : idleFlickerAmount;
         float flickerSpeed = isMoving ? movingFlickerSpeed : idleFlickerSpeed;
 
-        float baseIntensity = isOn ? onIntensity : offIntensity;
+        float baseIntensity = canShowLight ? onIntensity : offIntensity;
         float flicker = 0f;
 
-        if (isOn)
+        if (canShowLight)
         {
             float noise = Mathf.PerlinNoise(noiseSeed, Time.time * flickerSpeed);
             flicker = (noise - 0.5f) * 2f * flickerAmount;
         }
 
         float targetIntensity = Mathf.Max(0f, baseIntensity + flicker);
+
+        if (instant)
+        {
+            SetLightIntensity(targetIntensity);
+            return;
+        }
+
         float newIntensity = Mathf.Lerp(
             GetLightIntensity(),
             targetIntensity,
@@ -236,12 +242,20 @@ public class FlashlightController : MonoBehaviour
         }
 
         Component[] components = GetComponents<Component>();
+
         foreach (Component component in components)
         {
-            if (component == null) continue;
-            if (component is Transform) continue;
-            if (component is Collider2D) continue;
-            if (component is FlashlightController) continue;
+            if (component == null)
+                continue;
+
+            if (component is Transform)
+                continue;
+
+            if (component is Collider2D)
+                continue;
+
+            if (component is FlashlightController)
+                continue;
 
             PropertyInfo property = component.GetType().GetProperty(
                 "intensity",
@@ -259,7 +273,7 @@ public class FlashlightController : MonoBehaviour
             }
         }
 
-        Debug.LogWarning("На объекте света не найден компонент Light/Light2D с полем intensity.");
+        Debug.LogWarning("На объекте фонаря не найден компонент Light или Light2D с intensity.");
     }
 
     private float GetLightIntensity()
@@ -268,7 +282,7 @@ public class FlashlightController : MonoBehaviour
             return 0f;
 
         object value = intensityProperty.GetValue(resolvedLightComponent);
-        return value is float f ? f : 0f;
+        return value is float floatValue ? floatValue : 0f;
     }
 
     private void SetLightIntensity(float value)
@@ -277,5 +291,44 @@ public class FlashlightController : MonoBehaviour
             return;
 
         intensityProperty.SetValue(resolvedLightComponent, value);
+    }
+
+    public void ModifyActiveDuration(float value, SkillValueMode mode)
+    {
+        bool wasFull = currentCharge >= activeDuration - 0.01f;
+
+        activeDuration = ApplyValue(activeDuration, value, mode, 0.1f);
+
+        if (wasFull)
+            currentCharge = activeDuration;
+        else
+            currentCharge = Mathf.Clamp(currentCharge, 0f, activeDuration);
+    }
+
+    public void ModifyRechargeDuration(float value, SkillValueMode mode)
+    {
+        rechargeDuration = ApplyValue(rechargeDuration, value, mode, 0.01f);
+    }
+
+    private float ApplyValue(float current, float value, SkillValueMode mode, float minValue)
+    {
+        float result = current;
+
+        switch (mode)
+        {
+            case SkillValueMode.Add:
+                result = current + value;
+                break;
+
+            case SkillValueMode.Multiply:
+                result = current * value;
+                break;
+
+            case SkillValueMode.Set:
+                result = value;
+                break;
+        }
+
+        return Mathf.Max(result, minValue);
     }
 }

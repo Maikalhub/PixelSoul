@@ -12,11 +12,14 @@ public class SkillTree : MonoBehaviour
 
     private List<Skill> SkillList = new List<Skill>();
     private List<SkillConnection> connections = new List<SkillConnection>();
-
     private Dictionary<SkillSO, Skill> skillMap = new Dictionary<SkillSO, Skill>();
 
     private void Start()
     {
+        SkillList.Clear();
+        connections.Clear();
+        skillMap.Clear();
+
         foreach (Skill skill in SkillHolder.GetComponentsInChildren<Skill>())
         {
             SkillList.Add(skill);
@@ -30,15 +33,25 @@ public class SkillTree : MonoBehaviour
         UpdateAllSkillUI();
     }
 
+    private void OnEnable()
+    {
+        if (SkillList != null && SkillList.Count > 0)
+        {
+            UpdateAllSkillUI();
+        }
+    }
+
     void GenerateConnections()
     {
         foreach (Skill skill in SkillList)
         {
-            if (skill.skillSO.requiredSkills == null) continue;
+            if (skill.skillSO.requiredSkills == null)
+                continue;
 
             foreach (SkillSO required in skill.skillSO.requiredSkills)
             {
-                if (!skillMap.ContainsKey(required)) continue;
+                if (!skillMap.ContainsKey(required))
+                    continue;
 
                 Skill from = skillMap[required];
                 Skill to = skill;
