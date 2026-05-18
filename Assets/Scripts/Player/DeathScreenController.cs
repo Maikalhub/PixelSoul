@@ -24,15 +24,44 @@ public class DeathScreenController : MonoBehaviour
 
     private bool isShowing;
 
-    // Ключ для временного хранения индекса уровня между перезагрузками сцены
+    // Ключи для сохранения состояния
     private const string RESTART_LEVEL_INDEX_KEY = "TempRestartLevelIndex";
+    private const string PLAYER_STATE_SAVED_KEY = "PlayerStateSaved";
+
+    // Статы персонажа
+    private const string KEY_MAX_HEALTH = "PlayerMaxHealth";
+    private const string KEY_CURRENT_HEALTH = "PlayerCurrentHealth";
+    private const string KEY_MAX_STAMINA = "PlayerMaxStamina";
+    private const string KEY_CURRENT_STAMINA = "PlayerCurrentStamina";
+    private const string KEY_ATTACK_DAMAGE = "PlayerAttackDamage";
+    private const string KEY_DEFENSE = "PlayerDefense";
+    private const string KEY_MOVE_SPEED = "PlayerMoveSpeed";
+    private const string KEY_JUMP_POWER = "PlayerJumpPower";
+    private const string KEY_SPRINT_MULT = "PlayerSprintMultiplier";
+    private const string KEY_DASH_SPEED = "PlayerDashSpeed";
+    private const string KEY_THROW_FORCE = "PlayerThrowForce";
+    private const string KEY_THROW_COOLDOWN = "PlayerThrowCooldown";
+
+    // Эффекты навыков
+    private const string KEY_CAN_SHOOT = "SkillCanShoot";
+    private const string KEY_HAS_FLASHLIGHT = "SkillHasFlashlight";
+    private const string KEY_REVIVE_CHARGES = "SkillReviveCharges";
+    private const string KEY_CURRENT_SHIELD = "SkillCurrentShield";
+    private const string KEY_MAX_SHIELD = "SkillMaxShield";
+    private const string KEY_EXTRA_PROJECTILES = "SkillExtraProjectiles";
+    private const string KEY_PROJECTILE_SPREAD = "SkillProjectileSpread";
+    private const string KEY_BULLET_SPLASH = "SkillBulletSplash";
+    private const string KEY_BULLET_SPLASH_DMG = "SkillBulletSplashDmg";
+    private const string KEY_BULLET_SPLASH_RADIUS = "SkillBulletSplashRadius";
+
+    // Монеты
+    private const string KEY_COINS = "PlayerCoins";
 
     private void Awake()
     {
         Initialize();
-
-        // Восстанавливаем уровень после перезагрузки (если был рестарт)
         RestoreLevelAfterRestart();
+        RestorePlayerState();
     }
 
     private void Initialize()
@@ -54,7 +83,6 @@ public class DeathScreenController : MonoBehaviour
     private void PrepareCanvasGroup(CanvasGroup group)
     {
         if (group == null) return;
-
         group.alpha = 0f;
         group.interactable = false;
         group.blocksRaycasts = false;
@@ -144,25 +172,16 @@ public class DeathScreenController : MonoBehaviour
 
     // ================= КНОПКИ =================
 
-    /// <summary>
-    /// Рестарт текущего уровня
-    /// </summary>
     public void OnRestartButton()
     {
-        // Сохраняем индекс текущего уровня перед перезагрузкой сцены
+        SavePlayerState();
         StoreCurrentLevelIndexForRestart();
-
         StartCoroutine(FadeAndLoad(SceneManager.GetActiveScene().name));
     }
 
-    /// <summary>
-    /// Выход в главное меню
-    /// </summary>
     public void OnMainMenuButton()
     {
-        // Очищаем временный индекс, т.к. выходим в меню
-        PlayerPrefs.DeleteKey(RESTART_LEVEL_INDEX_KEY);
-
+        ClearAllTempData();
         StartCoroutine(FadeAndLoad(menuSceneName));
     }
 
@@ -175,41 +194,150 @@ public class DeathScreenController : MonoBehaviour
         SceneManager.LoadScene(sceneName);
     }
 
-    // ================= СОХРАНЕНИЕ / ВОССТАНОВЛЕНИЕ УРОВНЯ =================
+    // ================= СОХРАНЕНИЕ =================
 
-    /// <summary>
-    /// Сохраняет индекс текущего уровня в PlayerPrefs перед рестартом
-    /// </summary>
+    private void SavePlayerState()
+    {
+        PlayerMovement player = FindObjectOfType<PlayerMovement>();
+        SkillEffectApplier skillEffects = FindObjectOfType<SkillEffectApplier>();
+
+        if (player != null)
+        {
+            PlayerPrefs.SetInt(KEY_MAX_HEALTH, player.maxHealth);
+            PlayerPrefs.SetInt(KEY_CURRENT_HEALTH, player.currentHealth);
+            PlayerPrefs.SetFloat(KEY_MAX_STAMINA, player.maxStamina);
+            PlayerPrefs.SetFloat(KEY_CURRENT_STAMINA, player.currentStamina);
+            PlayerPrefs.SetInt(KEY_ATTACK_DAMAGE, player.attackDamage);
+            PlayerPrefs.SetInt(KEY_DEFENSE, player.defenseStat);
+            PlayerPrefs.SetFloat(KEY_MOVE_SPEED, player.moveSpeed);
+            PlayerPrefs.SetFloat(KEY_JUMP_POWER, player.jumpPower);
+            PlayerPrefs.SetFloat(KEY_SPRINT_MULT, player.sprintMultiplier);
+            PlayerPrefs.SetFloat(KEY_DASH_SPEED, player.dashSpeed);
+            PlayerPrefs.SetFloat(KEY_THROW_FORCE, player.throwForce);
+            PlayerPrefs.SetFloat(KEY_THROW_COOLDOWN, player.cooldown);
+        }
+
+        if (skillEffects != null)
+        {
+            PlayerPrefs.SetInt(KEY_CAN_SHOOT, skillEffects.CanShoot ? 1 : 0);
+            PlayerPrefs.SetInt(KEY_HAS_FLASHLIGHT, skillEffects.HasFlashlight ? 1 : 0);
+            PlayerPrefs.SetInt(KEY_REVIVE_CHARGES, skillEffects.ReviveCharges);
+            PlayerPrefs.SetFloat(KEY_CURRENT_SHIELD, skillEffects.CurrentShield);
+            PlayerPrefs.SetFloat(KEY_MAX_SHIELD, skillEffects.MaxShield);
+            PlayerPrefs.SetInt(KEY_EXTRA_PROJECTILES, skillEffects.ExtraProjectiles);
+            PlayerPrefs.SetFloat(KEY_PROJECTILE_SPREAD, skillEffects.ProjectileSpreadAngle);
+            PlayerPrefs.SetInt(KEY_BULLET_SPLASH, skillEffects.BulletSplashEnabled ? 1 : 0);
+            PlayerPrefs.SetFloat(KEY_BULLET_SPLASH_DMG, skillEffects.BulletSplashDamage);
+            PlayerPrefs.SetFloat(KEY_BULLET_SPLASH_RADIUS, skillEffects.BulletSplashRadius);
+        }
+
+        // Сохраняем монеты
+        PlayerPrefs.SetInt(KEY_COINS, CoinSystem.Instance != null ? CoinSystem.Instance.CurrentCoins : 0);
+
+        PlayerPrefs.SetInt(PLAYER_STATE_SAVED_KEY, 1);
+        PlayerPrefs.Save();
+
+        Debug.Log("DeathScreenController: Состояние сохранено.");
+    }
+
+    private void RestorePlayerState()
+    {
+        if (PlayerPrefs.GetInt(PLAYER_STATE_SAVED_KEY, 0) == 0)
+            return;
+
+        PlayerMovement player = FindObjectOfType<PlayerMovement>();
+        SkillEffectApplier skillEffects = FindObjectOfType<SkillEffectApplier>();
+
+        if (player != null)
+        {
+            player.maxHealth = PlayerPrefs.GetInt(KEY_MAX_HEALTH, player.maxHealth);
+            player.currentHealth = PlayerPrefs.GetInt(KEY_CURRENT_HEALTH, player.currentHealth);
+            player.maxStamina = PlayerPrefs.GetFloat(KEY_MAX_STAMINA, player.maxStamina);
+            player.currentStamina = PlayerPrefs.GetFloat(KEY_CURRENT_STAMINA, player.currentStamina);
+            player.attackDamage = PlayerPrefs.GetInt(KEY_ATTACK_DAMAGE, player.attackDamage);
+            player.defenseStat = PlayerPrefs.GetInt(KEY_DEFENSE, player.defenseStat);
+            player.moveSpeed = PlayerPrefs.GetFloat(KEY_MOVE_SPEED, player.moveSpeed);
+            player.jumpPower = PlayerPrefs.GetFloat(KEY_JUMP_POWER, player.jumpPower);
+            player.sprintMultiplier = PlayerPrefs.GetFloat(KEY_SPRINT_MULT, player.sprintMultiplier);
+            player.dashSpeed = PlayerPrefs.GetFloat(KEY_DASH_SPEED, player.dashSpeed);
+            player.throwForce = PlayerPrefs.GetFloat(KEY_THROW_FORCE, player.throwForce);
+            player.cooldown = PlayerPrefs.GetFloat(KEY_THROW_COOLDOWN, player.cooldown);
+        }
+
+        if (skillEffects != null)
+        {
+            skillEffects.RestoreEffects(
+                PlayerPrefs.GetInt(KEY_CAN_SHOOT, 0) == 1,
+                PlayerPrefs.GetInt(KEY_HAS_FLASHLIGHT, 0) == 1,
+                PlayerPrefs.GetInt(KEY_REVIVE_CHARGES, 0),
+                PlayerPrefs.GetFloat(KEY_CURRENT_SHIELD, 0f),
+                PlayerPrefs.GetFloat(KEY_MAX_SHIELD, 0f),
+                PlayerPrefs.GetInt(KEY_EXTRA_PROJECTILES, 0),
+                PlayerPrefs.GetFloat(KEY_PROJECTILE_SPREAD, 8f),
+                PlayerPrefs.GetInt(KEY_BULLET_SPLASH, 0) == 1,
+                PlayerPrefs.GetFloat(KEY_BULLET_SPLASH_DMG, 0f),
+                PlayerPrefs.GetFloat(KEY_BULLET_SPLASH_RADIUS, 0f)
+            );
+        }
+
+        // Восстанавливаем монеты
+        if (CoinSystem.Instance != null)
+        {
+            int savedCoins = PlayerPrefs.GetInt(KEY_COINS, 0);
+            CoinSystem.Instance.SetCoins(savedCoins);
+        }
+
+        Debug.Log("DeathScreenController: Состояние восстановлено.");
+    }
+
     private void StoreCurrentLevelIndexForRestart()
     {
         if (LevelManager.Instance != null)
         {
-            int currentIndex = LevelManager.Instance.CurrentLevelIndex;
-            PlayerPrefs.SetInt(RESTART_LEVEL_INDEX_KEY, currentIndex);
+            PlayerPrefs.SetInt(RESTART_LEVEL_INDEX_KEY, LevelManager.Instance.CurrentLevelIndex);
             PlayerPrefs.Save();
-
-            Debug.Log($"DeathScreenController: Сохранён индекс уровня {currentIndex} для рестарта.");
         }
     }
 
-    /// <summary>
-    /// Восстанавливает уровень после перезагрузки сцены (если был рестарт)
-    /// </summary>
     private void RestoreLevelAfterRestart()
     {
         if (PlayerPrefs.HasKey(RESTART_LEVEL_INDEX_KEY))
         {
             int savedIndex = PlayerPrefs.GetInt(RESTART_LEVEL_INDEX_KEY);
-
-            // Очищаем ключ, чтобы не восстановить случайно при следующей загрузке
             PlayerPrefs.DeleteKey(RESTART_LEVEL_INDEX_KEY);
 
-            // Восстанавливаем уровень через LevelManager
             if (LevelManager.Instance != null)
-            {
-                Debug.Log($"DeathScreenController: Восстановление уровня {savedIndex} после рестарта.");
                 LevelManager.Instance.SetCurrentLevelFromCode(savedIndex, true);
-            }
         }
+    }
+
+    private void ClearAllTempData()
+    {
+        PlayerPrefs.DeleteKey(RESTART_LEVEL_INDEX_KEY);
+        PlayerPrefs.DeleteKey(PLAYER_STATE_SAVED_KEY);
+        PlayerPrefs.DeleteKey(KEY_MAX_HEALTH);
+        PlayerPrefs.DeleteKey(KEY_CURRENT_HEALTH);
+        PlayerPrefs.DeleteKey(KEY_MAX_STAMINA);
+        PlayerPrefs.DeleteKey(KEY_CURRENT_STAMINA);
+        PlayerPrefs.DeleteKey(KEY_ATTACK_DAMAGE);
+        PlayerPrefs.DeleteKey(KEY_DEFENSE);
+        PlayerPrefs.DeleteKey(KEY_MOVE_SPEED);
+        PlayerPrefs.DeleteKey(KEY_JUMP_POWER);
+        PlayerPrefs.DeleteKey(KEY_SPRINT_MULT);
+        PlayerPrefs.DeleteKey(KEY_DASH_SPEED);
+        PlayerPrefs.DeleteKey(KEY_THROW_FORCE);
+        PlayerPrefs.DeleteKey(KEY_THROW_COOLDOWN);
+        PlayerPrefs.DeleteKey(KEY_CAN_SHOOT);
+        PlayerPrefs.DeleteKey(KEY_HAS_FLASHLIGHT);
+        PlayerPrefs.DeleteKey(KEY_REVIVE_CHARGES);
+        PlayerPrefs.DeleteKey(KEY_CURRENT_SHIELD);
+        PlayerPrefs.DeleteKey(KEY_MAX_SHIELD);
+        PlayerPrefs.DeleteKey(KEY_EXTRA_PROJECTILES);
+        PlayerPrefs.DeleteKey(KEY_PROJECTILE_SPREAD);
+        PlayerPrefs.DeleteKey(KEY_BULLET_SPLASH);
+        PlayerPrefs.DeleteKey(KEY_BULLET_SPLASH_DMG);
+        PlayerPrefs.DeleteKey(KEY_BULLET_SPLASH_RADIUS);
+        PlayerPrefs.DeleteKey(KEY_COINS);
+        PlayerPrefs.Save();
     }
 }

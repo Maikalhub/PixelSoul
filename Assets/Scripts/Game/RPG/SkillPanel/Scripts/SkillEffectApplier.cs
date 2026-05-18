@@ -147,6 +147,55 @@ public class SkillEffectApplier : MonoBehaviour
             flashlight.SetUnlocked(false);
     }
 
+    /// <summary>
+    /// Восстанавливает эффекты навыков (для использования после рестарта)
+    /// </summary>
+    public void RestoreEffects(
+        bool canShoot,
+        bool hasFlashlight,
+        int reviveCharges,
+        float currentShield,
+        float maxShield,
+        int extraProjectiles,
+        float projectileSpreadAngle,
+        bool bulletSplashEnabled,
+        float bulletSplashDamage,
+        float bulletSplashRadius)
+    {
+        // Очищаем текущие эффекты
+        appliedSkillIds.Clear();
+        triggerIcons.Clear();
+
+        // Применяем восстановленные значения
+        this.canShoot = canShoot;
+        this.hasFlashlight = hasFlashlight;
+        this.reviveCharges = reviveCharges;
+        this.currentShield = currentShield;
+        this.maxShield = maxShield;
+        this.extraProjectiles = extraProjectiles;
+        this.projectileSpreadAngle = projectileSpreadAngle;
+        this.bulletSplashEnabled = bulletSplashEnabled;
+        this.bulletSplashDamage = bulletSplashDamage;
+        this.bulletSplashRadius = bulletSplashRadius;
+
+        // Восстанавливаем фонарик
+        if (hasFlashlight)
+        {
+            if (EnsureFlashlightExists(true))
+            {
+                flashlight.SetUnlocked(true);
+                ConnectFlashlight();
+            }
+        }
+        else
+        {
+            if (flashlight != null)
+                flashlight.SetUnlocked(false);
+        }
+
+        Debug.Log($"SkillEffectApplier: Эффекты восстановлены. CanShoot={canShoot}, HasFlashlight={hasFlashlight}, Revive={reviveCharges}, Shield={currentShield}/{maxShield}");
+    }
+
     public bool ApplySkill(SkillSO skill)
     {
         if (skill == null)

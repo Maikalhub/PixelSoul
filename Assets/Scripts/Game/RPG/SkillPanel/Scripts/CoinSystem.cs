@@ -13,7 +13,14 @@ public class CoinSystem : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     private void Start()
@@ -47,6 +54,15 @@ public class CoinSystem : MonoBehaviour
         {
             Debug.LogWarning("CoinSystem: coinText не назначен в Inspector.");
         }
+    }
+
+    /// <summary>
+    /// Устанавливает количество монет (для восстановления после рестарта)
+    /// </summary>
+    public void SetCoins(int amount)
+    {
+        CurrentCoins = Mathf.Max(0, amount);
+        RefreshAllUI();
     }
 
     private void RefreshAllUI()
