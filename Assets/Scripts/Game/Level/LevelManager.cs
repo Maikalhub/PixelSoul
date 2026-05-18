@@ -113,8 +113,6 @@ public class LevelManager : MonoBehaviour
     public int CurrentLevelIndex => currentLevelIndex;
     public int CollectedKeys => collectedKeys;
 
-    // Оставлено для совместимости с другими скриптами.
-    // Сохранения больше нет, поэтому всегда false.
     public bool RememberProgress => false;
 
     private void OnValidate()
@@ -156,17 +154,6 @@ public class LevelManager : MonoBehaviour
         playerRb = player.GetComponent<Rigidbody2D>();
 
         InitializeRuntimeLevelProgress();
-
-        // Если есть сохранённый прогресс — загружаем последний уровень
-        if (LevelProgressManager.Instance != null && LevelProgressManager.Instance.ProgressData != null)
-        {
-            int savedLevel = LevelProgressManager.Instance.ProgressData.lastLevelIndex;
-            if (savedLevel >= 0 && savedLevel < levels.Length)
-            {
-                currentLevelIndex = savedLevel;
-                Debug.Log($"LevelManager: Загружен сохранённый уровень {savedLevel}");
-            }
-        }
 
         currentLevelIndex = Mathf.Clamp(currentLevelIndex, 0, levels.Length - 1);
 
@@ -649,7 +636,6 @@ public class LevelManager : MonoBehaviour
         ShowCurrentLevelTitle();
     }
 
-    // Оставлено для совместимости. Теперь ничего не сохраняет.
     public void SaveCurrentProgressNow()
     {
         StoreCollectedKeysForCurrentLevel();

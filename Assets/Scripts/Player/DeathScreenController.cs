@@ -22,9 +22,6 @@ public class DeathScreenController : MonoBehaviour
     [Header("Scene Names")]
     [SerializeField] private string menuSceneName = "Menu";
 
-    [Header("Level Progress")]
-    [SerializeField] private LevelProgressManager levelProgressManager;
-
     private bool isShowing;
 
     // Ключ для временного хранения индекса уровня между перезагрузками сцены
@@ -34,19 +31,7 @@ public class DeathScreenController : MonoBehaviour
     {
         Initialize();
 
-        // Ищем LevelProgressManager
-        if (levelProgressManager == null)
-        {
-            // Сначала ищем в корне сцены
-            levelProgressManager = FindObjectOfType<LevelProgressManager>();
-
-            // Если не нашли — он может быть в DontDestroyOnLoad
-            if (levelProgressManager == null && LevelProgressManager.Instance != null)
-            {
-                levelProgressManager = LevelProgressManager.Instance;
-            }
-        }
-
+        // Восстанавливаем уровень после перезагрузки (если был рестарт)
         RestoreLevelAfterRestart();
     }
 
@@ -79,9 +64,6 @@ public class DeathScreenController : MonoBehaviour
     public void ShowDeathScreen()
     {
         if (isShowing) return;
-
-        SaveLevelProgress();
-
         StartCoroutine(ShowDeathScreenRoutine());
     }
 
@@ -167,8 +149,6 @@ public class DeathScreenController : MonoBehaviour
     /// </summary>
     public void OnRestartButton()
     {
-        SaveLevelProgress();
-
         // Сохраняем индекс текущего уровня перед перезагрузкой сцены
         StoreCurrentLevelIndexForRestart();
 
@@ -180,8 +160,6 @@ public class DeathScreenController : MonoBehaviour
     /// </summary>
     public void OnMainMenuButton()
     {
-        SaveLevelProgress();
-
         // Очищаем временный индекс, т.к. выходим в меню
         PlayerPrefs.DeleteKey(RESTART_LEVEL_INDEX_KEY);
 
@@ -232,17 +210,6 @@ public class DeathScreenController : MonoBehaviour
                 Debug.Log($"DeathScreenController: Восстановление уровня {savedIndex} после рестарта.");
                 LevelManager.Instance.SetCurrentLevelFromCode(savedIndex, true);
             }
-        }
-    }
-
-    /// <summary>
-    /// Сохраняет текущий прогресс уровней
-    /// </summary>
-    private void SaveLevelProgress()
-    {
-        if (levelProgressManager != null)
-        {
-            levelProgressManager.UpdateProgressFromLevelManager();
         }
     }
 }
