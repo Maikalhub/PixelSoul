@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a320509cd29634e4189ab44f5db30e48, type: 3}
+  m_Name: Quick Recharge
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillId: 
+  skillName: Quick Recharge
+  description: 
+  skillIcon: {fileID: 0}
+  cost: 6
+  isLocked: 1
+  canBeUnlocked: 0
+  saveProgress: 0
+  permanentlyLocked: 0
+  requiredSkills:
+  - {fileID: 11400000, guid: b52dcf21a97644c4184748d305deb3d8, type: 2}
+  exclusiveSkills: []
+  requireAll: 1
+  upgradeType: 0
+  statModifiers:
+  - statType: 11
+    valueMode: 0
+    value: -1
+  specialEffects: []

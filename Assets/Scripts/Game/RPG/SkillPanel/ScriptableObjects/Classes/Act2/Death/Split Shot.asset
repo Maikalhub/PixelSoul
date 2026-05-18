@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a320509cd29634e4189ab44f5db30e48, type: 3}
+  m_Name: Split Shot
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillId: 
+  skillName: Split Shot
+  description: 
+  skillIcon: {fileID: 0}
+  cost: 9
+  isLocked: 1
+  canBeUnlocked: 0
+  saveProgress: 0
+  permanentlyLocked: 0
+  requiredSkills:
+  - {fileID: 11400000, guid: e2a4e4bc6d5dfa046befe84a5ea4efb4, type: 2}
+  exclusiveSkills: []
+  requireAll: 1
+  upgradeType: 1
+  statModifiers: []
+  specialEffects:
+  - effectType: 4
+    description: 
+    amount: 1
+    radius: 0
+    duration: 0
+    charges: 0
+    enabledOnUnlock: 1

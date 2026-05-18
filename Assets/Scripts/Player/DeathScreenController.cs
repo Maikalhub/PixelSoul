@@ -22,11 +22,32 @@ public class DeathScreenController : MonoBehaviour
     [Header("Scene Names")]
     [SerializeField] private string menuSceneName = "Menu";
 
+    [Header("Level Progress")]
+    [SerializeField] private LevelProgressManager levelProgressManager;
+
     private bool isShowing;
+
+    // Ключ для временного хранения индекса уровня между перезагрузками сцены
+    private const string RESTART_LEVEL_INDEX_KEY = "TempRestartLevelIndex";
 
     private void Awake()
     {
         Initialize();
+
+        // Ищем LevelProgressManager
+        if (levelProgressManager == null)
+        {
+            // Сначала ищем в корне сцены
+            levelProgressManager = FindObjectOfType<LevelProgressManager>();
+
+            // Если не нашли — он может быть в DontDestroyOnLoad
+            if (levelProgressManager == null && LevelProgressManager.Instance != null)
+            {
+                levelProgressManager = LevelProgressManager.Instance;
+            }
+        }
+
+        RestoreLevelAfterRestart();
     }
 
     private void Initialize()
@@ -58,6 +79,9 @@ public class DeathScreenController : MonoBehaviour
     public void ShowDeathScreen()
     {
         if (isShowing) return;
+
+        SaveLevelProgress();
+
         StartCoroutine(ShowDeathScreenRoutine());
     }
 
@@ -70,7 +94,6 @@ public class DeathScreenController : MonoBehaviour
 
         yield return StartCoroutine(FadeImageToAlpha(screenTargetAlpha, screenFadeDuration));
 
-        // Важно: после затемнения не блокируем кнопки
         if (fadeImage != null)
             fadeImage.raycastTarget = false;
 
@@ -137,13 +160,31 @@ public class DeathScreenController : MonoBehaviour
         }
     }
 
+    // ================= КНОПКИ =================
+
+    /// <summary>
+    /// Рестарт текущего уровня
+    /// </summary>
     public void OnRestartButton()
     {
+        SaveLevelProgress();
+
+        // Сохраняем индекс текущего уровня перед перезагрузкой сцены
+        StoreCurrentLevelIndexForRestart();
+
         StartCoroutine(FadeAndLoad(SceneManager.GetActiveScene().name));
     }
 
+    /// <summary>
+    /// Выход в главное меню
+    /// </summary>
     public void OnMainMenuButton()
     {
+        SaveLevelProgress();
+
+        // Очищаем временный индекс, т.к. выходим в меню
+        PlayerPrefs.DeleteKey(RESTART_LEVEL_INDEX_KEY);
+
         StartCoroutine(FadeAndLoad(menuSceneName));
     }
 
@@ -154,5 +195,54 @@ public class DeathScreenController : MonoBehaviour
 
         yield return StartCoroutine(FadeImageToAlpha(1f, 0.25f));
         SceneManager.LoadScene(sceneName);
+    }
+
+    // ================= СОХРАНЕНИЕ / ВОССТАНОВЛЕНИЕ УРОВНЯ =================
+
+    /// <summary>
+    /// Сохраняет индекс текущего уровня в PlayerPrefs перед рестартом
+    /// </summary>
+    private void StoreCurrentLevelIndexForRestart()
+    {
+        if (LevelManager.Instance != null)
+        {
+            int currentIndex = LevelManager.Instance.CurrentLevelIndex;
+            PlayerPrefs.SetInt(RESTART_LEVEL_INDEX_KEY, currentIndex);
+            PlayerPrefs.Save();
+
+            Debug.Log($"DeathScreenController: Сохранён индекс уровня {currentIndex} для рестарта.");
+        }
+    }
+
+    /// <summary>
+    /// Восстанавливает уровень после перезагрузки сцены (если был рестарт)
+    /// </summary>
+    private void RestoreLevelAfterRestart()
+    {
+        if (PlayerPrefs.HasKey(RESTART_LEVEL_INDEX_KEY))
+        {
+            int savedIndex = PlayerPrefs.GetInt(RESTART_LEVEL_INDEX_KEY);
+
+            // Очищаем ключ, чтобы не восстановить случайно при следующей загрузке
+            PlayerPrefs.DeleteKey(RESTART_LEVEL_INDEX_KEY);
+
+            // Восстанавливаем уровень через LevelManager
+            if (LevelManager.Instance != null)
+            {
+                Debug.Log($"DeathScreenController: Восстановление уровня {savedIndex} после рестарта.");
+                LevelManager.Instance.SetCurrentLevelFromCode(savedIndex, true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Сохраняет текущий прогресс уровней
+    /// </summary>
+    private void SaveLevelProgress()
+    {
+        if (levelProgressManager != null)
+        {
+            levelProgressManager.UpdateProgressFromLevelManager();
+        }
     }
 }

@@ -23,7 +23,8 @@ public class EnemyHealthUI : MonoBehaviour
     [SerializeField] private string customObjectName;
 
     [Header("Canvas Visibility")]
-    [SerializeField] private bool showCanvasOnlyAfterLevelStart = true;
+    [SerializeField] private bool showCanvasOnlyAfterTrigger = true;
+    [SerializeField] private bool hideCanvasWhenEnemyDead = true;
 
     [Header("Flash Settings")]
     [SerializeField] private bool flashOnDamage = true;
@@ -54,7 +55,7 @@ public class EnemyHealthUI : MonoBehaviour
         RefreshDisplayMode();
         UpdateNameDisplay();
 
-        canShowCanvas = !showCanvasOnlyAfterLevelStart;
+        canShowCanvas = !showCanvasOnlyAfterTrigger;
 
         if (isCanvasMode)
             SetCanvasActive(false);
@@ -62,13 +63,12 @@ public class EnemyHealthUI : MonoBehaviour
 
     private void Start()
     {
-        if (showCanvasOnlyAfterLevelStart)
-            canShowCanvas = true;
-
-        if (isCanvasMode && enemyAI != null && enemyAI.gameObject.activeInHierarchy && canShowCanvas)
+        if (isCanvasMode)
         {
-            SetCanvasActive(true);
-            UpdateHealthDisplay();
+            SetCanvasActive(canShowCanvas && IsEnemyValid());
+
+            if (canShowCanvas && IsEnemyValid())
+                UpdateHealthDisplay();
         }
     }
 
@@ -89,6 +89,7 @@ public class EnemyHealthUI : MonoBehaviour
         {
             if (isCanvasMode)
                 SetCanvasActive(false);
+
             return;
         }
 
@@ -96,6 +97,7 @@ public class EnemyHealthUI : MonoBehaviour
         {
             if (isCanvasMode)
                 SetCanvasActive(false);
+
             return;
         }
 
@@ -103,13 +105,20 @@ public class EnemyHealthUI : MonoBehaviour
         {
             if (isCanvasMode)
                 SetCanvasActive(false);
+
             return;
         }
-        else
+
+        if (hideCanvasWhenEnemyDead && enemyAI.health <= 0)
         {
             if (isCanvasMode)
-                SetCanvasActive(true);
+                SetCanvasActive(false);
+
+            return;
         }
+
+        if (isCanvasMode)
+            SetCanvasActive(true);
 
         if (followEnemy)
         {
@@ -124,6 +133,61 @@ public class EnemyHealthUI : MonoBehaviour
         }
 
         UpdateHealthDisplay();
+    }
+
+    public void ActivateCanvasDisplay()
+    {
+        canShowCanvas = true;
+
+        if (enemyAI == null && targetEnemy != null)
+            enemyAI = targetEnemy;
+
+        if (enemyAI != null)
+            maxHealth = Mathf.Max(1f, enemyAI.maxHealth);
+
+        UpdateNameDisplay();
+
+        if (isCanvasMode && IsEnemyValid())
+        {
+            SetCanvasActive(true);
+            UpdateHealthDisplay();
+        }
+    }
+
+    public void DeactivateCanvasDisplay()
+    {
+        canShowCanvas = false;
+
+        if (isCanvasMode)
+            SetCanvasActive(false);
+    }
+
+    public void SetTargetEnemy(EnemyAI newEnemy)
+    {
+        targetEnemy = newEnemy;
+        enemyAI = newEnemy;
+
+        if (enemyAI != null)
+            maxHealth = Mathf.Max(1f, enemyAI.maxHealth);
+
+        lastSpriteIndex = -1;
+
+        UpdateNameDisplay();
+        UpdateHealthDisplay();
+    }
+
+    private bool IsEnemyValid()
+    {
+        if (enemyAI == null)
+            return false;
+
+        if (!enemyAI.gameObject.activeInHierarchy)
+            return false;
+
+        if (hideCanvasWhenEnemyDead && enemyAI.health <= 0)
+            return false;
+
+        return true;
     }
 
     private void RefreshDisplayMode()

@@ -12,5 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d1fb1161952b5b34193df6c8ad90ef14, type: 3}
   m_Name: SettingsData
   m_EditorClassIdentifier: Assembly-CSharp::SettingsData
-  soundVolume: 0
-  graphicsQuality: 1
+  language: ru
+  fullscreenMode: 2
+  showFPS: 1
+  qualityLevel: 5
+  resolutionIndex: 0
+  vsync: 1
+  textureQuality: 1
+  masterVolume: 0.18888889
+  musicVolume: 0.73006237
+  sfxVolume: 0.2
+  controllerVibration: 1
+  subtitles: 1
+  uiScale: 1.2332842

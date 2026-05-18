@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a320509cd29634e4189ab44f5db30e48, type: 3}
+  m_Name: Faster Throw I
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillId: 
+  skillName: Faster Throw I
+  description: 
+  skillIcon: {fileID: 699742988220537437, guid: 82524e951670e7246bb1f44433a58e6f, type: 3}
+  cost: 1
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
+  isLocked: 1
+  canBeUnlocked: 0
+  permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
+  requiredSkills:
+  - {fileID: 11400000, guid: ae4f218bf00c90a4db49bd1026e700b0, type: 2}
+  exclusiveSkills: []
+  requireAll: 1
+  upgradeType: 0
+  statModifiers:
+  - statType: 9
+    valueMode: 0
+    value: -0.1
+  specialEffects: []

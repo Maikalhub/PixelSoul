@@ -4,14 +4,31 @@ using UnityEngine.UI;
 public class SkillConnection : MonoBehaviour
 {
     [Header("Connection")]
-    public Skill fromSkill;
-    public Skill toSkill;
+    [SerializeField] private Skill fromSkill;
+    [SerializeField] private Skill toSkill;
 
+    [Header("Visual")]
     [SerializeField] private float thickness = 5f;
     [SerializeField] private float buttonPadding = 8f;
 
+    [Header("Colors")]
+    [SerializeField] private Color lockedColor = Color.white;
+    [SerializeField] private Color unlockedColor = Color.green;
+    [SerializeField] private Color permanentlyLockedColor = Color.gray;
+
     private RectTransform rect;
+    private RectTransform parentRect;
     private Image image;
+
+    private void Awake()
+    {
+        Init();
+    }
+
+    private void OnEnable()
+    {
+        UpdateConnection();
+    }
 
     private void Init()
     {
@@ -20,6 +37,19 @@ public class SkillConnection : MonoBehaviour
 
         if (image == null)
             image = GetComponent<Image>();
+
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+        }
+
+        if (transform.parent != null)
+            parentRect = transform.parent.GetComponent<RectTransform>();
+
+        if (image != null)
+            image.raycastTarget = false;
     }
 
     public void Setup(Skill from, Skill to)
@@ -31,16 +61,13 @@ public class SkillConnection : MonoBehaviour
 
         if (fromSkill == null || toSkill == null)
         {
-            Debug.LogError("SkillConnection: fromSkill or toSkill is NULL");
+            Debug.LogWarning("SkillConnection: fromSkill or toSkill is null.");
             return;
         }
 
         transform.SetAsFirstSibling();
 
-        if (image != null)
-            image.raycastTarget = false;
-
-        UpdatePosition();
+        UpdateConnection();
     }
 
     public void UpdateConnection()
@@ -50,14 +77,31 @@ public class SkillConnection : MonoBehaviour
         if (fromSkill == null || toSkill == null)
             return;
 
-        transform.SetAsFirstSibling();
+        if (fromSkill.skillSO == null || toSkill.skillSO == null)
+            return;
+
+        UpdateColor();
+        UpdatePosition();
+    }
+
+    private void UpdateColor()
+    {
+        if (image == null)
+            return;
 
         if (toSkill.skillSO.permanentlyLocked)
-            image.color = Color.gray;
-        else if (!fromSkill.skillSO.isLocked)
-            image.color = Color.green;
-        else
-            image.color = Color.white;
+        {
+            image.color = permanentlyLockedColor;
+            return;
+        }
+
+        if (!fromSkill.skillSO.isLocked)
+        {
+            image.color = unlockedColor;
+            return;
+        }
+
+        image.color = lockedColor;
     }
 
     public void UpdatePosition()
@@ -67,32 +111,36 @@ public class SkillConnection : MonoBehaviour
         if (fromSkill == null || toSkill == null)
             return;
 
+        if (rect == null || parentRect == null)
+            return;
+
         RectTransform fromRect = fromSkill.GetComponent<RectTransform>();
         RectTransform toRect = toSkill.GetComponent<RectTransform>();
 
         if (fromRect == null || toRect == null)
         {
-            Debug.LogError("SkillConnection: Skill objects must have RectTransform.");
+            Debug.LogWarning("SkillConnection: Skill objects must have RectTransform.");
             return;
         }
 
-        transform.SetAsFirstSibling();
+        Vector2 fromCenterWorld = fromRect.TransformPoint(fromRect.rect.center);
+        Vector2 toCenterWorld = toRect.TransformPoint(toRect.rect.center);
 
-        Vector2 fromCenter = fromRect.TransformPoint(fromRect.rect.center);
-        Vector2 toCenter = toRect.TransformPoint(toRect.rect.center);
+        Vector2 worldDirection = toCenterWorld - fromCenterWorld;
 
-        Vector2 direction = toCenter - fromCenter;
-        float fullDistance = direction.magnitude;
-
-        if (fullDistance <= 0.001f)
+        if (worldDirection.magnitude <= 0.001f)
             return;
 
-        Vector2 dirNormalized = direction.normalized;
+        Vector2 dirNormalized = worldDirection.normalized;
 
-        Vector2 startPoint = GetRectEdgePoint(fromRect, dirNormalized) + dirNormalized * buttonPadding;
-        Vector2 endPoint = GetRectEdgePoint(toRect, -dirNormalized) - dirNormalized * buttonPadding;
+        Vector2 startWorld = GetRectEdgePoint(fromRect, dirNormalized) + dirNormalized * buttonPadding;
+        Vector2 endWorld = GetRectEdgePoint(toRect, -dirNormalized) - dirNormalized * buttonPadding;
 
-        float distance = Vector2.Distance(startPoint, endPoint);
+        Vector2 startLocal = parentRect.InverseTransformPoint(startWorld);
+        Vector2 endLocal = parentRect.InverseTransformPoint(endWorld);
+
+        Vector2 localDirection = endLocal - startLocal;
+        float distance = localDirection.magnitude;
 
         if (distance <= 0.001f)
         {
@@ -100,11 +148,13 @@ public class SkillConnection : MonoBehaviour
             return;
         }
 
-        rect.position = (startPoint + endPoint) * 0.5f;
+        rect.anchoredPosition = (startLocal + endLocal) * 0.5f;
         rect.sizeDelta = new Vector2(distance, thickness);
 
-        float angle = Mathf.Atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x) * Mathf.Rad2Deg;
-        rect.rotation = Quaternion.Euler(0f, 0f, angle);
+        float angle = Mathf.Atan2(localDirection.y, localDirection.x) * Mathf.Rad2Deg;
+        rect.localRotation = Quaternion.Euler(0f, 0f, angle);
+
+        transform.SetAsFirstSibling();
     }
 
     private Vector2 GetRectEdgePoint(RectTransform targetRect, Vector2 worldDirection)

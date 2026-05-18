@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &4220500184247812298
+--- !u!1 &5685022000273739477
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,12 +8,12 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 9209525177883263334}
-  - component: {fileID: 4779041125507105157}
-  - component: {fileID: 4999042158066476832}
-  - component: {fileID: 486885281177838433}
-  - component: {fileID: 2490049790624117825}
-  - component: {fileID: 8320978492820446079}
+  - component: {fileID: 7772737664781778719}
+  - component: {fileID: 1519760460935449607}
+  - component: {fileID: 5226394443795175686}
+  - component: {fileID: 8787721517952038116}
+  - component: {fileID: 3600198723246780987}
+  - component: {fileID: 6363196387844879327}
   m_Layer: 0
   m_Name: BoostCoin
   m_TagString: Untagged
@@ -21,28 +21,28 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &9209525177883263334
+--- !u!4 &7772737664781778719
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4220500184247812298}
+  m_GameObject: {fileID: 5685022000273739477}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -1.122, y: 4.927, z: 0}
+  m_LocalPosition: {x: -26.849998, y: 1.8999999, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &4779041125507105157
+--- !u!212 &1519760460935449607
 SpriteRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4220500184247812298}
+  m_GameObject: {fileID: 5685022000273739477}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -80,11 +80,11 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 1693260379
-  m_SortingLayer: 5
+  m_SortingLayerID: -737811201
+  m_SortingLayer: 8
   m_SortingOrder: 0
   m_Sprite: {fileID: 4468415103505425487, guid: 69e9ad5c7c200e0458f7567c810d8b05, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.09803922}
+  m_Color: {r: 1, g: 0.7879016, b: 0, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -94,13 +94,13 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!58 &4999042158066476832
+--- !u!58 &5226394443795175686
 CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4220500184247812298}
+  m_GameObject: {fileID: 5685022000273739477}
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
@@ -130,14 +130,14 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.48486328
---- !u!95 &486885281177838433
+--- !u!95 &8787721517952038116
 Animator:
   serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4220500184247812298}
+  m_GameObject: {fileID: 5685022000273739477}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
   m_Controller: {fileID: 9100000, guid: 9487ed307191a8347bb69d0ebf35f907, type: 2}
@@ -152,13 +152,13 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &2490049790624117825
+--- !u!114 &3600198723246780987
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4220500184247812298}
+  m_GameObject: {fileID: 5685022000273739477}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5e819cf3c572b8c43b4e9121467cf5b5, type: 3}
@@ -166,25 +166,47 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FloatingCoin
   floatAmplitude: 0.5
   floatFrequency: 1
---- !u!114 &8320978492820446079
+--- !u!114 &6363196387844879327
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4220500184247812298}
+  m_GameObject: {fileID: 5685022000273739477}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f0b51ace2818cfd429f9d1b22706e31a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BoostCoin
-  boostType: 1
+  boostType: 0
   boostAmount: 5
-  boostDuration: 5
+  boostDuration: 20
   speedVisual: {fileID: 0}
   staminaVisual: {fileID: 0}
   attackVisual: {fileID: 0}
   healthVisual: {fileID: 0}
+  radialPanelUI: {fileID: 0}
+  findRadialPanelAutomatically: 1
+  speedIcon: {fileID: -6982104778697299700, guid: d914e16fe9c48c04fadc082d72bc2c80, type: 3}
+  staminaIcon: {fileID: -2507418935330783864, guid: d9b22120c1fac7c4eb5248968c2b5795, type: 3}
+  attackIcon: {fileID: 447926653892412510, guid: 50990f3b72aa55744bef6871f237a9e8, type: 3}
+  healthIcon: {fileID: 406715458377503907, guid: 583bdc1141a014d459e3f074f6e18979, type: 3}
+  speedName: Speed
+  staminaName: Stamina
+  attackName: Attack
+  healthName: Health
+  healthRadialDuration: 1
+  messageManager: {fileID: 0}
+  findMessageManagerAutomatically: 1
+  showBoostMessages: 1
+  speedMessageFormat: 'Speed boost: +{0} for {1:0.#}s'
+  staminaMessageFormat: 'Stamina boost: +{0} for {1:0.#}s'
+  attackMessageFormat: 'Attack boost: +{0} for {1:0.#}s'
+  healthMessageFormat: 'Health restored: +{0}'
+  speedMessageColor: {r: 1, g: 1, b: 1, a: 1}
+  staminaMessageColor: {r: 1, g: 1, b: 1, a: 1}
+  attackMessageColor: {r: 1, g: 1, b: 1, a: 1}
+  healthMessageColor: {r: 1, g: 1, b: 1, a: 1}
   spawnMode: 0
   respawnDelay: 0
   spawnMin: {x: 0, y: 0}

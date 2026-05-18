@@ -80,11 +80,27 @@ public class SkillSO : ScriptableObject
     public Sprite skillIcon;
     public int cost = 1;
 
-    [Header("State")]
+    [Header("Default State")]
+    [Tooltip("Locked-состояние по умолчанию. К нему навык вернётся при сбросе.")]
+    public bool defaultIsLocked = true;
+
+    [Tooltip("Can Be Unlocked по умолчанию. Обычно лучше оставить false, потому что доступность пересчитывается через зависимости.")]
+    public bool defaultCanBeUnlocked = false;
+
+    [Tooltip("Permanently Locked по умолчанию.")]
+    public bool defaultPermanentlyLocked = false;
+
+    [Header("Runtime State")]
     public bool isLocked = true;
     public bool canBeUnlocked = false;
-    public bool saveProgress = true;
     public bool permanentlyLocked = false;
+
+    [Header("Save / Reset")]
+    [Tooltip("Если выключено, ResetSkill() будет возвращать навык в Default State при старте дерева навыков.")]
+    public bool saveProgress = true;
+
+    [Tooltip("Если включено, при выходе из Play Mode / закрытии игры навык принудительно вернётся в Default State.")]
+    public bool resetToDefaultOnExit = true;
 
     [Header("Dependencies")]
     public SkillSO[] requiredSkills;
@@ -105,6 +121,29 @@ public class SkillSO : ScriptableObject
         upgradeType == SkillUpgradeType.SpecialEffect &&
         specialEffects != null &&
         specialEffects.Count > 0;
+
+    private void OnEnable()
+    {
+        Application.quitting -= HandleApplicationQuitting;
+        Application.quitting += HandleApplicationQuitting;
+    }
+
+    private void OnDisable()
+    {
+        Application.quitting -= HandleApplicationQuitting;
+
+        if (!Application.isPlaying)
+            return;
+
+        if (resetToDefaultOnExit)
+            ResetToDefaultState();
+    }
+
+    private void HandleApplicationQuitting()
+    {
+        if (resetToDefaultOnExit)
+            ResetToDefaultState();
+    }
 
     public void Unlock()
     {
@@ -131,9 +170,33 @@ public class SkillSO : ScriptableObject
     {
         if (!saveProgress)
         {
-            isLocked = true;
-            canBeUnlocked = false;
-            permanentlyLocked = false;
+            ResetToDefaultState();
         }
+    }
+
+    public void ForceResetSkill()
+    {
+        ResetToDefaultState();
+    }
+
+    public void ResetToDefaultState()
+    {
+        isLocked = defaultIsLocked;
+        canBeUnlocked = defaultCanBeUnlocked;
+        permanentlyLocked = defaultPermanentlyLocked;
+    }
+
+    [ContextMenu("Set Current State As Default")]
+    public void SetCurrentStateAsDefault()
+    {
+        defaultIsLocked = isLocked;
+        defaultCanBeUnlocked = canBeUnlocked;
+        defaultPermanentlyLocked = permanentlyLocked;
+    }
+
+    [ContextMenu("Reset To Default State")]
+    public void ResetToDefaultStateFromContextMenu()
+    {
+        ResetToDefaultState();
     }
 }

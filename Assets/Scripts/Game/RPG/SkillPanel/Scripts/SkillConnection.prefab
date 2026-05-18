@@ -90,5 +90,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SkillConnection
   fromSkill: {fileID: 0}
   toSkill: {fileID: 0}
-  thickness: 5
-  buttonPadding: 5
+  thickness: 4
+  buttonPadding: 0

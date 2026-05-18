@@ -1,21 +1,15 @@
 ﻿using UnityEngine;
-using System.Collections;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using TMPro;                          // <-- для TMP_Dropdown
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine.SceneManagement;
 
 public class MenuManager : MonoBehaviour
 {
     private enum MenuState { ScreenMenu, MainMenu }
     private MenuState currentState;
-
-    [Header("INFO")]
-    [TextArea(3, 6)]
-    [SerializeField]
-    private string info =
-        "Этот скрипт управляет главным меню.\n" +
-        "• Любая кнопка → переход в MainMenu\n" +
-        "• Бездействие → возврат в ScreenMenu\n" +
-        "• Есть плавное затемнение сцены";
 
     [Header("ROOT MENUS")]
     [SerializeField] private GameObject screenMenu;
@@ -31,6 +25,38 @@ public class MenuManager : MonoBehaviour
     [Header("SETTINGS MENU TABS")]
     [SerializeField] private GameObject[] settingsTabs;
     [SerializeField] private int defaultSettingsTab = 0;
+
+    // ========== ССЫЛКИ НА UI (теперь TMP_Dropdown) ==========
+    [Header("Главные (General)")]
+    [SerializeField] private TMP_Dropdown languageDropdown;
+    [SerializeField] private TMP_Dropdown fullscreenModeDropdown;
+    [SerializeField] private Toggle showFPSToggle;
+
+    [Header("Графика")]
+    [SerializeField] private TMP_Dropdown qualityDropdown;
+    [SerializeField] private TMP_Dropdown resolutionDropdown;
+    [SerializeField] private Toggle vsyncToggle;
+    [SerializeField] private Slider textureQualitySlider;
+
+    [Header("Звук")]
+    [SerializeField] private Slider masterVolumeSlider;
+    [SerializeField] private Slider musicVolumeSlider;
+    [SerializeField] private Slider sfxVolumeSlider;
+
+    [Header("Другие")]
+    [SerializeField] private Toggle vibrationToggle;
+    [SerializeField] private Toggle subtitlesToggle;
+    [SerializeField] private Slider uiScaleSlider;
+
+    // Словарь языков
+    private Dictionary<string, string> languages = new Dictionary<string, string>
+    {
+        { "en", "English" },
+        { "ru", "Русский" },
+        { "de", "Deutsch" }
+    };
+
+    private bool settingsInitialized = false;
 
     [Header("UI")]
     [SerializeField] private BlinkText screenMenuBlinkText;
@@ -77,6 +103,8 @@ public class MenuManager : MonoBehaviour
             exitTextObject.SetActive(false);
 
         PlayBackgroundMusic(currentMusicIndex);
+
+        InitializeSettings();   // использует назначенные в инспекторе ссылки
     }
 
     private void Update()
@@ -85,7 +113,6 @@ public class MenuManager : MonoBehaviour
         {
             if (Input.anyKeyDown || Input.GetMouseButtonDown(0))
                 OpenMainMenu(null);
-
             return;
         }
 
@@ -101,10 +128,7 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    private void ResetIdleTimer()
-    {
-        idleTimer = 0f;
-    }
+    private void ResetIdleTimer() => idleTimer = 0f;
 
     // ================= SCREEN MENU =================
     private void ShowScreenMenuImmediate()
@@ -114,7 +138,6 @@ public class MenuManager : MonoBehaviour
 
         screenMenuBlinkText?.ResetBlink();
         ResetIdleTimer();
-
         isTransitioning = false;
         currentState = MenuState.ScreenMenu;
     }
@@ -128,17 +151,14 @@ public class MenuManager : MonoBehaviour
     private IEnumerator ReturnToScreenMenuRoutine()
     {
         isTransitioning = true;
-
         PlayTransitionSound();
         yield return StartCoroutine(FadeImage(0f, 1f));
 
         if (mainMenu != null) mainMenu.SetActive(false);
         if (screenMenu != null) screenMenu.SetActive(true);
-
         screenMenuBlinkText?.ResetBlink();
 
         yield return StartCoroutine(FadeImage(1f, 0f));
-
         currentState = MenuState.ScreenMenu;
         ResetIdleTimer();
         isTransitioning = false;
@@ -148,13 +168,11 @@ public class MenuManager : MonoBehaviour
     public void OpenMainMenu(AudioClip clickSound)
     {
         if (isTransitioning || currentState != MenuState.ScreenMenu) return;
-
         isTransitioning = true;
         currentState = MenuState.MainMenu;
 
         PlayClickSound(clickSound);
         screenMenuBlinkText?.SetFastColorSpeed();
-
         StartCoroutine(OpenMainMenuRoutine());
     }
 
@@ -165,67 +183,35 @@ public class MenuManager : MonoBehaviour
 
         if (screenMenu != null) screenMenu.SetActive(false);
         if (mainMenu != null) mainMenu.SetActive(true);
-
         ShowStartMenu(null);
 
         yield return StartCoroutine(FadeImage(1f, 0f));
-
         ResetIdleTimer();
         isTransitioning = false;
     }
 
     // ================= SUB MENUS =================
-    public void ShowStartMenu(AudioClip clickSound)
-    {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        DisableAllSubMenus();
-        if (startMenu != null) startMenu.SetActive(true);
-    }
-
-    public void ShowNewGameMenu(AudioClip clickSound)
-    {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        DisableAllSubMenus();
-        if (newgameMenu != null) newgameMenu.SetActive(true);
-    }
-
-    public void ShowLoadMenu(AudioClip clickSound)
-    {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        DisableAllSubMenus();
-        if (loadMenu != null) loadMenu.SetActive(true);
-    }
-
-    public void ShowLevelMenu(AudioClip clickSound)
-    {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        DisableAllSubMenus();
-        if (levelMenu != null) levelMenu.SetActive(true);
-    }
-
+    public void ShowStartMenu(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); DisableAllSubMenus(); if (startMenu) startMenu.SetActive(true); }
+    public void ShowNewGameMenu(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); DisableAllSubMenus(); if (newgameMenu) newgameMenu.SetActive(true); }
+    public void ShowLoadMenu(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); DisableAllSubMenus(); if (loadMenu) loadMenu.SetActive(true); }
+    public void ShowLevelMenu(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); DisableAllSubMenus(); if (levelMenu) levelMenu.SetActive(true); }
     public void ShowSettingsMenu(AudioClip clickSound)
     {
         PlayClickSound(clickSound);
         ResetIdleTimer();
         DisableAllSubMenus();
-
-        if (settingsMenu != null)
-            settingsMenu.SetActive(true);
-
+        if (settingsMenu) settingsMenu.SetActive(true);
         ShowSettingsTabInternal(defaultSettingsTab);
+        RefreshSettingsUI();
     }
 
     private void DisableAllSubMenus()
     {
-        if (startMenu != null) startMenu.SetActive(false);
-        if (newgameMenu != null) newgameMenu.SetActive(false);
-        if (loadMenu != null) loadMenu.SetActive(false);
-        if (levelMenu != null) levelMenu.SetActive(false);
-        if (settingsMenu != null) settingsMenu.SetActive(false);
+        if (startMenu) startMenu.SetActive(false);
+        if (newgameMenu) newgameMenu.SetActive(false);
+        if (loadMenu) loadMenu.SetActive(false);
+        if (levelMenu) levelMenu.SetActive(false);
+        if (settingsMenu) settingsMenu.SetActive(false);
     }
 
     // ================= SETTINGS TABS =================
@@ -233,61 +219,171 @@ public class MenuManager : MonoBehaviour
     {
         if (settingsTabs == null || settingsTabs.Length == 0) return;
         if (index < 0 || index >= settingsTabs.Length) return;
-
         for (int i = 0; i < settingsTabs.Length; i++)
+            if (settingsTabs[i]) settingsTabs[i].SetActive(i == index);
+    }
+
+    public void SettingsTab1(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); ShowSettingsTabInternal(0); }
+    public void SettingsTab2(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); ShowSettingsTabInternal(1); }
+    public void SettingsTab3(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); ShowSettingsTabInternal(2); }
+    public void SettingsTab4(AudioClip clickSound) { PlayClickSound(clickSound); ResetIdleTimer(); ShowSettingsTabInternal(3); }
+
+    // ================= ИНИЦИАЛИЗАЦИЯ НАСТРОЕК =================
+    private void InitializeSettings()
+    {
+        if (SettingsManager.Instance == null)
         {
-            if (settingsTabs[i] != null)
-                settingsTabs[i].SetActive(i == index);
+            Debug.LogError("SettingsManager не найден в сцене!");
+            return;
         }
+
+        // Проверяем, что все ссылки назначены
+        if (languageDropdown == null || qualityDropdown == null || resolutionDropdown == null)
+        {
+            Debug.LogError("Не все UI-элементы настроек назначены в инспекторе! Перетащи нужные TMP_Dropdown, Toggle и Slider.");
+            return;
+        }
+
+        // Заполняем дропдауны
+        PopulateLanguageDropdown();
+        PopulateFullscreenDropdown();
+        PopulateQualityDropdown();
+        PopulateResolutionDropdown();
+
+        // Настройка слайдеров
+        textureQualitySlider.minValue = 0;
+        textureQualitySlider.maxValue = 2;
+        textureQualitySlider.wholeNumbers = true;
+
+        uiScaleSlider.minValue = 0.5f;
+        uiScaleSlider.maxValue = 2f;
+
+        // Подписываемся на изменения
+        languageDropdown.onValueChanged.AddListener(OnLanguageChanged);
+        fullscreenModeDropdown.onValueChanged.AddListener(OnFullscreenModeChanged);
+        showFPSToggle.onValueChanged.AddListener(OnShowFPSChanged);
+
+        qualityDropdown.onValueChanged.AddListener(OnQualityChanged);
+        resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
+        vsyncToggle.onValueChanged.AddListener(OnVSyncChanged);
+        textureQualitySlider.onValueChanged.AddListener(OnTextureQualityChanged);
+
+        masterVolumeSlider.onValueChanged.AddListener(OnMasterVolumeChanged);
+        musicVolumeSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
+        sfxVolumeSlider.onValueChanged.AddListener(OnSFXVolumeChanged);
+
+        vibrationToggle.onValueChanged.AddListener(OnVibrationChanged);
+        subtitlesToggle.onValueChanged.AddListener(OnSubtitlesChanged);
+        uiScaleSlider.onValueChanged.AddListener(OnUIScaleChanged);
+
+        settingsInitialized = true;
+        RefreshSettingsUI();
     }
 
-    public void SettingsTab1(AudioClip clickSound)
+    private void PopulateLanguageDropdown()
     {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        ShowSettingsTabInternal(0);
+        languageDropdown.ClearOptions();
+        languageDropdown.AddOptions(languages.Values.ToList());
     }
 
-    public void SettingsTab2(AudioClip clickSound)
+    private void PopulateFullscreenDropdown()
     {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        ShowSettingsTabInternal(1);
+        fullscreenModeDropdown.ClearOptions();
+        fullscreenModeDropdown.AddOptions(new List<string> { "Exclusive Fullscreen", "Borderless Window", "Windowed" });
     }
 
-    public void SettingsTab3(AudioClip clickSound)
+    private void PopulateQualityDropdown()
     {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        ShowSettingsTabInternal(2);
+        qualityDropdown.ClearOptions();
+        qualityDropdown.AddOptions(QualitySettings.names.ToList());
     }
 
-    public void SettingsTab4(AudioClip clickSound)
+    private void PopulateResolutionDropdown()
     {
-        PlayClickSound(clickSound);
-        ResetIdleTimer();
-        ShowSettingsTabInternal(3);
+        resolutionDropdown.ClearOptions();
+        var options = new List<string>();
+        foreach (var res in SettingsManager.Instance.Resolutions)
+            options.Add($"{res.width} x {res.height}");
+        resolutionDropdown.AddOptions(options);
     }
+
+    private void RefreshSettingsUI()
+    {
+        if (!settingsInitialized || SettingsManager.Instance == null) return;
+
+        var s = SettingsManager.Instance.Settings;
+
+        // Главные
+        SetLanguageDropdownValue(s.language);
+        fullscreenModeDropdown.value = s.fullscreenMode;
+        showFPSToggle.isOn = s.showFPS;
+
+        // Графика
+        qualityDropdown.value = s.qualityLevel;
+        SetResolutionDropdownValue();
+        vsyncToggle.isOn = s.vsync;
+        textureQualitySlider.value = s.textureQuality;
+
+        // Звук
+        masterVolumeSlider.value = s.masterVolume;
+        musicVolumeSlider.value = s.musicVolume;
+        sfxVolumeSlider.value = s.sfxVolume;
+
+        // Другие
+        vibrationToggle.isOn = s.controllerVibration;
+        subtitlesToggle.isOn = s.subtitles;
+        uiScaleSlider.value = s.uiScale;
+    }
+
+    private void SetLanguageDropdownValue(string langKey)
+    {
+        int idx = languages.Keys.ToList().IndexOf(langKey);
+        if (idx >= 0) languageDropdown.value = idx;
+    }
+
+    private void SetResolutionDropdownValue()
+    {
+        int idx = SettingsManager.Instance.Settings.resolutionIndex;
+        if (idx >= 0 && idx < resolutionDropdown.options.Count)
+            resolutionDropdown.value = idx;
+        else
+            resolutionDropdown.value = 0;
+    }
+
+    // Обработчики изменений UI
+    private void OnLanguageChanged(int idx)
+    {
+        if (!settingsInitialized) return;
+        string key = languages.Keys.ElementAt(idx);
+        SettingsManager.Instance.SetLanguage(key);
+    }
+    private void OnFullscreenModeChanged(int mode) { if (settingsInitialized) SettingsManager.Instance.SetFullscreenMode(mode); }
+    private void OnShowFPSChanged(bool on) { if (settingsInitialized) SettingsManager.Instance.SetShowFPS(on); }
+    private void OnQualityChanged(int idx) { if (settingsInitialized) SettingsManager.Instance.SetQuality(idx); }
+    private void OnResolutionChanged(int idx) { if (settingsInitialized) SettingsManager.Instance.SetResolutionIndex(idx); }
+    private void OnVSyncChanged(bool on) { if (settingsInitialized) SettingsManager.Instance.SetVSync(on); }
+    private void OnTextureQualityChanged(float v) { if (settingsInitialized) SettingsManager.Instance.SetTextureQuality((int)v); }
+    private void OnMasterVolumeChanged(float v) { if (settingsInitialized) SettingsManager.Instance.SetMasterVolume(v); }
+    private void OnMusicVolumeChanged(float v) { if (settingsInitialized) SettingsManager.Instance.SetMusicVolume(v); }
+    private void OnSFXVolumeChanged(float v) { if (settingsInitialized) SettingsManager.Instance.SetSFXVolume(v); }
+    private void OnVibrationChanged(bool on) { if (settingsInitialized) SettingsManager.Instance.SetControllerVibration(on); }
+    private void OnSubtitlesChanged(bool on) { if (settingsInitialized) SettingsManager.Instance.SetSubtitles(on); }
+    private void OnUIScaleChanged(float s) { if (settingsInitialized) SettingsManager.Instance.SetUIScale(s); }
 
     // ================= EXIT BUTTON =================
     public void ExitGame(AudioClip clickSound)
     {
         if (isTransitioning) return;
-
         PlayClickSound(clickSound);
         ResetIdleTimer();
 
         if (exitTextObject != null)
         {
             exitTextObject.SetActive(true);
-
             CanvasGroup cg = exitTextObject.GetComponent<CanvasGroup>();
-            if (cg == null)
-                cg = exitTextObject.AddComponent<CanvasGroup>();
-
+            if (cg == null) cg = exitTextObject.AddComponent<CanvasGroup>();
             cg.alpha = 0f;
         }
-
         StartCoroutine(ExitGameRoutine());
     }
 
@@ -295,13 +391,11 @@ public class MenuManager : MonoBehaviour
     {
         isTransitioning = true;
 
-        // 1. Затемнение экрана
         if (backgroundFade != null)
         {
             float fadeStart = backgroundFade.color.a;
             float fadeEnd = 1f;
             float t = 0f;
-
             while (t < exitFadeDuration)
             {
                 t += Time.deltaTime;
@@ -310,30 +404,25 @@ public class MenuManager : MonoBehaviour
                 backgroundFade.color = c;
                 yield return null;
             }
-
             Color final = backgroundFade.color;
             final.a = fadeEnd;
             backgroundFade.color = final;
         }
 
-        // 2. Проявление текста
         if (exitTextObject != null)
         {
             CanvasGroup cg = exitTextObject.GetComponent<CanvasGroup>();
             float textFadeDuration = 0.5f;
             float t = 0f;
-
             while (t < textFadeDuration)
             {
                 t += Time.deltaTime;
                 cg.alpha = Mathf.Lerp(0f, 1f, t / textFadeDuration);
                 yield return null;
             }
-
             cg.alpha = 1f;
         }
 
-        // 3. Пауза перед выходом
         yield return new WaitForSeconds(0.5f);
 
 #if UNITY_EDITOR
@@ -346,14 +435,12 @@ public class MenuManager : MonoBehaviour
     // ================= AUDIO =================
     private void PlayClickSound(AudioClip clip)
     {
-        if (uiAudioSource == null || clip == null) return;
-        uiAudioSource.PlayOneShot(clip);
+        if (uiAudioSource != null && clip != null) uiAudioSource.PlayOneShot(clip);
     }
 
     private void PlayTransitionSound()
     {
-        if (uiAudioSource != null && transitionSound != null)
-            uiAudioSource.PlayOneShot(transitionSound);
+        if (uiAudioSource != null && transitionSound != null) uiAudioSource.PlayOneShot(transitionSound);
     }
 
     private void PlayBackgroundMusic(int index)
@@ -370,17 +457,14 @@ public class MenuManager : MonoBehaviour
     private IEnumerator FadeOutMusic()
     {
         if (musicAudioSource == null) yield break;
-
         float startVol = musicAudioSource.volume;
         float t = 0f;
-
         while (t < musicFadeDuration)
         {
             t += Time.deltaTime;
             musicAudioSource.volume = Mathf.Lerp(startVol, 0f, t / musicFadeDuration);
             yield return null;
         }
-
         musicAudioSource.volume = 0f;
         musicAudioSource.Stop();
     }
@@ -389,10 +473,8 @@ public class MenuManager : MonoBehaviour
     private IEnumerator FadeImage(float from, float to)
     {
         if (backgroundFade == null) yield break;
-
         float t = 0f;
         Color c = backgroundFade.color;
-
         while (t < fadeDuration)
         {
             t += Time.deltaTime;
@@ -400,7 +482,6 @@ public class MenuManager : MonoBehaviour
             backgroundFade.color = c;
             yield return null;
         }
-
         c.a = to;
         backgroundFade.color = c;
     }
@@ -408,7 +489,6 @@ public class MenuManager : MonoBehaviour
     private void SetFadeAlpha(float a)
     {
         if (backgroundFade == null) return;
-
         Color c = backgroundFade.color;
         c.a = a;
         backgroundFade.color = c;
@@ -424,13 +504,10 @@ public class MenuManager : MonoBehaviour
     private IEnumerator LoadSceneRoutine(AudioClip clickSound)
     {
         isTransitioning = true;
-
         PlayClickSound(clickSound);
         PlayTransitionSound();
-
         yield return StartCoroutine(FadeImage(0f, 1f));
         yield return StartCoroutine(FadeOutMusic());
-
         SceneManager.LoadScene(sceneToLoad);
     }
 
@@ -438,7 +515,6 @@ public class MenuManager : MonoBehaviour
     public void QuitGame(AudioClip clickSound)
     {
         PlayClickSound(clickSound);
-
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else

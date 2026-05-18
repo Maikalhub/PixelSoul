@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a320509cd29634e4189ab44f5db30e48, type: 3}
+  m_Name: Quick Bones I
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillId: 
+  skillName: Quick Bones I
+  description: 
+  skillIcon: {fileID: 4841216214093879422, guid: bc0003707ee623444a3f9ae35534de5a, type: 3}
+  cost: 4
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
+  isLocked: 1
+  canBeUnlocked: 0
+  permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
+  requiredSkills:
+  - {fileID: 11400000, guid: 18214e1922d9fcd46acc2c61ce1b7d81, type: 2}
+  exclusiveSkills:
+  - {fileID: 11400000, guid: 7b53dbf0ac5c8e14a9fe101ea3d2532c, type: 2}
+  requireAll: 1
+  upgradeType: 0
+  statModifiers:
+  - statType: 4
+    valueMode: 0
+    value: 0.4
+  specialEffects: []

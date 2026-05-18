@@ -76,6 +76,30 @@ public class SkillResearchRadialIconUI : MonoBehaviour
             parentMaskImage.fillAmount = 1f;
     }
 
+    public void SetupBoost(Sprite boostIcon, string boostName, float duration, SkillResearchRadialPanelUI owner)
+    {
+        this.owner = owner;
+        this.duration = Mathf.Max(0.01f, duration);
+
+        timer = 0f;
+        isFinished = false;
+
+        CacheReferences();
+        SetupParentMask();
+
+        if (boostIcon != null && iconImage != null)
+        {
+            iconImage.sprite = boostIcon;
+            iconImage.preserveAspect = true;
+        }
+
+        if (skillNameText != null)
+            skillNameText.text = boostName;
+
+        if (parentMaskImage != null)
+            parentMaskImage.fillAmount = 1f;
+    }
+
     private void Update()
     {
         if (isFinished)
