@@ -15,12 +15,16 @@ MonoBehaviour:
   skillId: 
   skillName: Split Shot
   description: 
-  skillIcon: {fileID: 0}
-  cost: 9
+  skillIcon: {fileID: -6982104778697299700, guid: d914e16fe9c48c04fadc082d72bc2c80, type: 3}
+  cost: 3
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
   isLocked: 1
   canBeUnlocked: 0
-  saveProgress: 0
   permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
   requiredSkills:
   - {fileID: 11400000, guid: e2a4e4bc6d5dfa046befe84a5ea4efb4, type: 2}
   exclusiveSkills: []

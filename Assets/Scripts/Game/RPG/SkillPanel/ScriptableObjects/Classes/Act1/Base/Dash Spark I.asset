@@ -16,7 +16,7 @@ MonoBehaviour:
   skillName: Dash Spark I
   description: 
   skillIcon: {fileID: -556974013050493502, guid: 3f9d3cd8724fdbe46a28a1fab0be7eb9, type: 3}
-  cost: 5
+  cost: 3
   defaultIsLocked: 1
   defaultCanBeUnlocked: 0
   defaultPermanentlyLocked: 0

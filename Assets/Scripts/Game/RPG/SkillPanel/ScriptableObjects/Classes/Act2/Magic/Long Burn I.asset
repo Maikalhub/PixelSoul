@@ -15,12 +15,16 @@ MonoBehaviour:
   skillId: 
   skillName: Long Burn I
   description: 
-  skillIcon: {fileID: 0}
-  cost: 6
+  skillIcon: {fileID: -2278440341621924931, guid: 9647bf988f1237a4e8520dd724ca95ff, type: 3}
+  cost: 4
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
   isLocked: 1
   canBeUnlocked: 0
-  saveProgress: 0
   permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
   requiredSkills:
   - {fileID: 11400000, guid: b52dcf21a97644c4184748d305deb3d8, type: 2}
   exclusiveSkills: []

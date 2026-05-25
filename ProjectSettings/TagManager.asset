@@ -17,6 +17,7 @@ TagManager:
   - PlayerAttack
   - Door
   - Key
+  - Trigger
   layers:
   - Default
   - TransparentFX

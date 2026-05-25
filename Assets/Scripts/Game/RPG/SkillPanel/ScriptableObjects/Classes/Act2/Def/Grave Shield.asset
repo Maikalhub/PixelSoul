@@ -15,12 +15,16 @@ MonoBehaviour:
   skillId: 
   skillName: Grave Shield
   description: 
-  skillIcon: {fileID: 0}
-  cost: 9
+  skillIcon: {fileID: 7976121198395911719, guid: 1075d2cfdd2638d4fa322b9bdd30df0c, type: 3}
+  cost: 4
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
   isLocked: 1
   canBeUnlocked: 0
-  saveProgress: 0
   permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
   requiredSkills:
   - {fileID: 11400000, guid: 0d338c52db5be284f8157b483aab0c8c, type: 2}
   exclusiveSkills: []

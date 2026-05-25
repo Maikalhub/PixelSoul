@@ -15,12 +15,16 @@ MonoBehaviour:
   skillId: 
   skillName: Soul Lantern
   description: 
-  skillIcon: {fileID: 0}
-  cost: 8
+  skillIcon: {fileID: 3928878328890046419, guid: fc49399afadc7de489ccbd4830956fa7, type: 3}
+  cost: 5
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
   isLocked: 1
   canBeUnlocked: 0
-  saveProgress: 0
   permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
   requiredSkills:
   - {fileID: 11400000, guid: 18214e1922d9fcd46acc2c61ce1b7d81, type: 2}
   exclusiveSkills: []

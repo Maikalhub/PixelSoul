@@ -17,7 +17,37 @@ public class BreakTile : MonoBehaviour
     public AudioClip breakSound;           // Звук разрушения
     public float volume = 1f;              // Громкость
 
+    [Header("Unlockable Objects Settings")]
+    [Tooltip("Если включено, активирует объекты ниже после разрушения плитки")]
+    public bool unlockObjectsOnBreak = false;
+    [Tooltip("Объекты (например, лут), которые станут доступны после взрыва")]
+    public GameObject[] objectsToUnlock;
+
     private bool isBroken = false;         // Чтобы срабатывало только один раз
+
+    private void Awake()
+    {
+        // Если галочка стоит, на старте игры автоматически выключаем эти объекты,
+        // чтобы игрок не мог их подобрать или увидеть раньше времени.
+        if (unlockObjectsOnBreak && objectsToUnlock != null)
+        {
+            foreach (GameObject obj in objectsToUnlock)
+            {
+                if (obj != null)
+                {
+                    // Вариант 1: Выключаем объект целиком
+                    obj.SetActive(false);
+
+                    // Вариант 2: Если нужно, чтобы объект был ВИДЕН, но его нельзя было ПОДОБРАТЬ,
+                    // закомментируй строку выше и раскомментируй код ниже (он выключит только коллайдер):
+                    /*
+                    Collider2D col = obj.GetComponent<Collider2D>();
+                    if (col != null) col.enabled = false;
+                    */
+                }
+            }
+        }
+    }
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
@@ -46,6 +76,25 @@ public class BreakTile : MonoBehaviour
 
     public void Break(GameObject attackObject)
     {
+        // Включаем заблокированные объекты в момент удара
+        if (unlockObjectsOnBreak && objectsToUnlock != null)
+        {
+            foreach (GameObject obj in objectsToUnlock)
+            {
+                if (obj != null)
+                {
+                    // Вариант 1: Включаем объект целиком
+                    obj.SetActive(true);
+
+                    // Вариант 2: Если на старте выключали только коллайдер, включаем его обратно:
+                    /*
+                    Collider2D col = obj.GetComponent<Collider2D>();
+                    if (col != null) col.enabled = true;
+                    */
+                }
+            }
+        }
+
         StartCoroutine(BreakTiles(attackObject));
     }
 
@@ -91,8 +140,5 @@ public class BreakTile : MonoBehaviour
             sr.color = new Color(originalColor.r, originalColor.g, originalColor.b, Mathf.Lerp(1f, 0f, elapsed / fadeDuration));
             yield return null;
         }
-
-        // НЕ удаляем дочерние объекты по одному
-        // Destroy(sr.gameObject); <-- больше не нужно
     }
 }

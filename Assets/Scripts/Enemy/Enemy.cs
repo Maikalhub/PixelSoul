@@ -8,8 +8,11 @@ public class EnemyAI : MonoBehaviour
 {
     public enum AIState { Patrolling, Chasing, Attacking, Evading, Idle, Alert, Retreating, Fleeing }
     public enum MovementMode { GroundOnly, SmartJump, JumpOnly }
-    public enum AttackType { Standard, Charge, Ranged }
+    public enum AttackType { Standard, Charge, Ranged, StationaryRanged, DisappearRanged }
     public enum PatrolRouteMode { Loop, PingPong }
+
+    public enum BossType { None, DisappearAmbusher, SelfSummoner }
+    public enum BossAmbushMode { BehindPlayer, RandomSide }
 
     [Header("AI Configuration")]
     public AIState currentState = AIState.Patrolling;
@@ -50,6 +53,11 @@ public class EnemyAI : MonoBehaviour
     public Transform firePoint;
     public float bulletSpeed = 10f;
     public float rangedShootDelay = 0.12f;
+
+    [Header("Disappear Ranged Settings")]
+    public float disappearDuration = 1.5f;
+    public bool disableColliderOnDisappear = true;
+    public bool stopPhysicsOnDisappear = true;
 
     [Header("Sight Settings")]
     public float sightRange = 10f;
@@ -94,6 +102,40 @@ public class EnemyAI : MonoBehaviour
     public bool canEvade = true;
     public bool canChase = true;
     public bool canAttack = true;
+
+    [Header("Boss Settings")]
+    public bool isBoss = false;
+    public BossType bossType = BossType.None;
+
+    [Header("Boss Visibility")]
+    public GameObject healthBarObject;
+    public bool hideAllChildSpriteRenderers = true;
+    public bool disableColliderWhenBossHidden = true;
+    public bool stopPhysicsWhenBossHidden = true;
+
+    [Header("Boss Special Cooldown")]
+    public float bossSpecialCooldown = 4f;
+    public float bossSpecialTriggerRange = 8f;
+
+    [Header("Boss Ambusher")]
+    public BossAmbushMode bossAmbushMode = BossAmbushMode.BehindPlayer;
+    public float bossDisappearTime = 1f;
+    public float bossReappearDistance = 2f;
+    public float bossReappearYOffset = 0f;
+    public float bossStrikeDelay = 0.2f;
+    public float bossStrikeSpeed = 10f;
+    public float bossStrikeDuration = 0.35f;
+
+    [Header("Boss Summoner")]
+    public GameObject[] summonPrefabs;
+    public Transform[] summonPoints;
+    public int summonCount = 2;
+    public float summonDelayBetween = 0.2f;
+    public float summonSpawnRadius = 1.5f;
+    public bool summonedCopiesCanSummon = true;
+    public int maxSummonGeneration = 2;
+
+    [HideInInspector] public int summonGeneration = 0;
 
     [Header("Light Visibility")]
     public bool startHidden = true;
@@ -146,11 +188,21 @@ public class EnemyAI : MonoBehaviour
     private bool hasLineOfSight;
     private Vector2 lastKnownPlayerPosition;
 
+    private float lastBossSpecialTime = -999f;
+    private bool isBossSpecialRunning;
+    private SpriteRenderer[] bossSpriteRenderers;
+    private Collider2D bossCollider;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        bossCollider = GetComponent<Collider2D>();
+
+        bossSpriteRenderers = hideAllChildSpriteRenderers
+            ? GetComponentsInChildren<SpriteRenderer>(true)
+            : new SpriteRenderer[] { spriteRenderer };
 
         if (spriteRenderer != null)
         {
@@ -188,12 +240,13 @@ public class EnemyAI : MonoBehaviour
         TryResolvePlayer();
         UpdateTargetInfo();
         HandleStateTransitions();
+        TryStartBossSpecial();
         UpdateAnimatorParameters();
     }
 
     private void FixedUpdate()
     {
-        if (isDead || isStunned || isCharging)
+        if (isDead || isStunned || isCharging || isBossSpecialRunning)
             return;
 
         switch (currentState)
@@ -285,7 +338,7 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
-        if (isPerformingAttack || isCharging)
+        if (isPerformingAttack || isCharging || isBossSpecialRunning)
         {
             currentState = AIState.Attacking;
             return;
@@ -538,7 +591,7 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
-        if (isCharging || isPerformingAttack)
+        if (isCharging || isPerformingAttack || isBossSpecialRunning)
             return;
 
         rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
@@ -561,6 +614,14 @@ public class EnemyAI : MonoBehaviour
 
             case AttackType.Ranged:
                 StartCoroutine(RangedAttackRoutine());
+                break;
+
+            case AttackType.StationaryRanged:
+                StartCoroutine(StationaryRangedRoutine());
+                break;
+
+            case AttackType.DisappearRanged:
+                StartCoroutine(DisappearRangedRoutine());
                 break;
         }
     }
@@ -663,6 +724,352 @@ public class EnemyAI : MonoBehaviour
             yield return new WaitForSeconds(remain);
 
         isPerformingAttack = false;
+    }
+
+    private IEnumerator StationaryRangedRoutine()
+    {
+        if (isPerformingAttack)
+            yield break;
+
+        isPerformingAttack = true;
+
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+        FaceTarget(player != null ? player.position : transform.position);
+
+        animator.ResetTrigger("attack");
+        animator.SetTrigger("attack");
+
+        yield return new WaitForSeconds(rangedShootDelay);
+
+        if (player != null && bulletPrefab != null && firePoint != null)
+        {
+            Vector2 direction = ((Vector2)player.position - (Vector2)firePoint.position).normalized;
+            if (direction.sqrMagnitude <= 0.001f)
+                direction = isFacingRight ? Vector2.right : Vector2.left;
+
+            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+
+            Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
+            if (bulletRb != null)
+                bulletRb.linearVelocity = direction * bulletSpeed;
+
+            bullet.transform.right = direction;
+
+            EnemyBullet bulletScript = bullet.GetComponent<EnemyBullet>();
+            if (bulletScript != null)
+                bulletScript.damage = attackDamage;
+        }
+
+        float remain = Mathf.Max(0f, attackLockDuration - rangedShootDelay);
+        if (remain > 0f)
+            yield return new WaitForSeconds(remain);
+
+        isPerformingAttack = false;
+    }
+
+    private IEnumerator DisappearRangedRoutine()
+    {
+        if (isPerformingAttack)
+            yield break;
+
+        isPerformingAttack = true;
+
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+        FaceTarget(player != null ? player.position : transform.position);
+
+        animator.ResetTrigger("attack");
+        animator.SetTrigger("attack");
+
+        yield return new WaitForSeconds(rangedShootDelay);
+
+        if (player != null && bulletPrefab != null && firePoint != null)
+        {
+            Vector2 direction = ((Vector2)player.position - (Vector2)firePoint.position).normalized;
+            if (direction.sqrMagnitude <= 0.001f)
+                direction = isFacingRight ? Vector2.right : Vector2.left;
+
+            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+
+            Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
+            if (bulletRb != null)
+                bulletRb.linearVelocity = direction * bulletSpeed;
+
+            bullet.transform.right = direction;
+
+            EnemyBullet bulletScript = bullet.GetComponent<EnemyBullet>();
+            if (bulletScript != null)
+                bulletScript.damage = attackDamage;
+        }
+
+        if (disableColliderOnDisappear)
+        {
+            Collider2D col = GetComponent<Collider2D>();
+            if (col != null)
+                col.enabled = false;
+        }
+
+        if (stopPhysicsOnDisappear)
+        {
+            rb.simulated = false;
+        }
+
+        SetLightVisible(false);
+        AnimationEvent_DisableMeleeHitbox();
+
+        yield return new WaitForSeconds(disappearDuration);
+
+        SetLightVisible(true);
+
+        if (disableColliderOnDisappear)
+        {
+            Collider2D col = GetComponent<Collider2D>();
+            if (col != null)
+                col.enabled = true;
+        }
+
+        if (stopPhysicsOnDisappear)
+        {
+            rb.simulated = true;
+            rb.linearVelocity = Vector2.zero;
+        }
+
+        float remain = Mathf.Max(0f, attackLockDuration - rangedShootDelay);
+        if (remain > 0f)
+            yield return new WaitForSeconds(remain);
+
+        isPerformingAttack = false;
+    }
+
+    private void TryStartBossSpecial()
+    {
+        if (!isBoss)
+            return;
+
+        if (bossType == BossType.None)
+            return;
+
+        if (isDead || isStunned || isBossSpecialRunning || isPerformingAttack || isCharging)
+            return;
+
+        if (player == null)
+            return;
+
+        if (Time.time - lastBossSpecialTime < bossSpecialCooldown)
+            return;
+
+        if (currentDistanceToPlayer > bossSpecialTriggerRange)
+            return;
+
+        if (!hasAggro && !hasLineOfSight)
+            return;
+
+        lastBossSpecialTime = Time.time;
+
+        switch (bossType)
+        {
+            case BossType.DisappearAmbusher:
+                StartCoroutine(BossDisappearAmbushRoutine());
+                break;
+
+            case BossType.SelfSummoner:
+                StartCoroutine(BossSummonRoutine());
+                break;
+        }
+    }
+
+    private IEnumerator BossDisappearAmbushRoutine()
+    {
+        isBossSpecialRunning = true;
+        isPerformingAttack = true;
+
+        rb.linearVelocity = Vector2.zero;
+        AnimationEvent_DisableMeleeHitbox();
+
+        SetBossHidden(true);
+
+        yield return new WaitForSeconds(bossDisappearTime);
+
+        if (player != null)
+        {
+            Vector3 newPosition = GetBossAmbushPosition();
+            transform.position = newPosition;
+            FaceTarget(player.position);
+        }
+
+        SetBossHidden(false);
+
+        yield return new WaitForSeconds(bossStrikeDelay);
+
+        if (player != null)
+        {
+            FaceTarget(player.position);
+
+            animator.ResetTrigger("attack");
+            animator.SetTrigger("attack");
+
+            yield return new WaitForSeconds(attackWindup);
+
+            AnimationEvent_EnableMeleeHitbox();
+
+            float dir = player.position.x > transform.position.x ? 1f : -1f;
+            float timer = 0f;
+
+            while (timer < bossStrikeDuration)
+            {
+                rb.linearVelocity = new Vector2(dir * bossStrikeSpeed, rb.linearVelocity.y);
+                timer += Time.fixedDeltaTime;
+                yield return new WaitForFixedUpdate();
+            }
+
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            AnimationEvent_DisableMeleeHitbox();
+        }
+
+        isPerformingAttack = false;
+        isBossSpecialRunning = false;
+    }
+
+    private Vector3 GetBossAmbushPosition()
+    {
+        if (player == null)
+            return transform.position;
+
+        float side;
+
+        if (bossAmbushMode == BossAmbushMode.RandomSide)
+        {
+            side = Random.value < 0.5f ? -1f : 1f;
+        }
+        else
+        {
+            Rigidbody2D playerRb = player.GetComponent<Rigidbody2D>();
+
+            if (playerRb != null && Mathf.Abs(playerRb.linearVelocity.x) > 0.1f)
+            {
+                side = playerRb.linearVelocity.x > 0f ? -1f : 1f;
+            }
+            else
+            {
+                side = player.localScale.x >= 0f ? -1f : 1f;
+            }
+        }
+
+        Vector3 position = player.position + new Vector3(
+            side * bossReappearDistance,
+            bossReappearYOffset,
+            0f
+        );
+
+        return position;
+    }
+
+    private IEnumerator BossSummonRoutine()
+    {
+        isBossSpecialRunning = true;
+        isPerformingAttack = true;
+
+        rb.linearVelocity = Vector2.zero;
+        FaceTarget(player != null ? player.position : transform.position);
+
+        animator.ResetTrigger("attack");
+        animator.SetTrigger("attack");
+
+        yield return new WaitForSeconds(attackWindup);
+
+        for (int i = 0; i < summonCount; i++)
+        {
+            SpawnSummonedEnemy(i);
+            yield return new WaitForSeconds(summonDelayBetween);
+        }
+
+        yield return new WaitForSeconds(attackLockDuration);
+
+        isPerformingAttack = false;
+        isBossSpecialRunning = false;
+    }
+
+    private void SpawnSummonedEnemy(int index)
+    {
+        GameObject prefab = GetRandomSummonPrefab();
+
+        if (prefab == null)
+            return;
+
+        Vector3 spawnPosition = GetSummonPosition(index);
+
+        GameObject newEnemy = Instantiate(prefab, spawnPosition, Quaternion.identity);
+
+        EnemyAI newEnemyAI = newEnemy.GetComponent<EnemyAI>();
+
+        if (newEnemyAI != null)
+        {
+            newEnemyAI.player = player;
+            newEnemyAI.summonGeneration = summonGeneration + 1;
+
+            if (!summonedCopiesCanSummon || newEnemyAI.summonGeneration >= maxSummonGeneration)
+            {
+                newEnemyAI.isBoss = false;
+                newEnemyAI.bossType = BossType.None;
+            }
+            else
+            {
+                newEnemyAI.isBoss = true;
+                newEnemyAI.bossType = BossType.SelfSummoner;
+                newEnemyAI.summonedCopiesCanSummon = summonedCopiesCanSummon;
+                newEnemyAI.maxSummonGeneration = maxSummonGeneration;
+            }
+        }
+    }
+
+    private GameObject GetRandomSummonPrefab()
+    {
+        if (summonPrefabs == null || summonPrefabs.Length == 0)
+            return null;
+
+        return summonPrefabs[Random.Range(0, summonPrefabs.Length)];
+    }
+
+    private Vector3 GetSummonPosition(int index)
+    {
+        if (summonPoints != null && summonPoints.Length > 0)
+        {
+            Transform point = summonPoints[index % summonPoints.Length];
+
+            if (point != null)
+                return point.position;
+        }
+
+        Vector2 randomOffset = Random.insideUnitCircle * summonSpawnRadius;
+
+        return transform.position + new Vector3(
+            randomOffset.x,
+            randomOffset.y,
+            0f
+        );
+    }
+
+    private void SetBossHidden(bool hidden)
+    {
+        if (healthBarObject != null)
+            healthBarObject.SetActive(!hidden);
+
+        if (bossSpriteRenderers != null)
+        {
+            for (int i = 0; i < bossSpriteRenderers.Length; i++)
+            {
+                if (bossSpriteRenderers[i] != null)
+                    bossSpriteRenderers[i].enabled = !hidden;
+            }
+        }
+
+        if (disableColliderWhenBossHidden && bossCollider != null)
+            bossCollider.enabled = !hidden;
+
+        if (stopPhysicsWhenBossHidden && rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.simulated = !hidden;
+        }
     }
 
     private void EvadeBehavior()
@@ -901,9 +1308,12 @@ public class EnemyAI : MonoBehaviour
         isStunned = true;
         isCharging = false;
         isPerformingAttack = false;
+        isBossSpecialRunning = false;
+
         rb.linearVelocity = Vector2.zero;
         currentState = AIState.Idle;
         AnimationEvent_DisableMeleeHitbox();
+        SetBossHidden(false);
 
         float timer = 0f;
         bool colorToggle = false;
@@ -936,9 +1346,25 @@ public class EnemyAI : MonoBehaviour
         if (isDead)
             return;
 
+        SetBossHidden(false);
+
+        SetLightVisible(true);
+        if (disableColliderOnDisappear)
+        {
+            Collider2D col = GetComponent<Collider2D>();
+            if (col != null)
+                col.enabled = true;
+        }
+
+        if (stopPhysicsOnDisappear)
+        {
+            rb.simulated = true;
+        }
+
         isDead = true;
         isCharging = false;
         isPerformingAttack = false;
+        isBossSpecialRunning = false;
 
         AnimationEvent_DisableMeleeHitbox();
 
@@ -1061,6 +1487,9 @@ public class EnemyAI : MonoBehaviour
 
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireSphere(transform.position, evadeRange);
+
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, bossSpecialTriggerRange);
 
         if (groundCheck != null)
         {

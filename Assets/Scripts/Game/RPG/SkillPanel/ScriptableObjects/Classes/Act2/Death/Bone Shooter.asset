@@ -15,12 +15,16 @@ MonoBehaviour:
   skillId: 
   skillName: Bone Shooter
   description: 
-  skillIcon: {fileID: 0}
-  cost: 8
+  skillIcon: {fileID: -2742122992267559303, guid: dee4a0dc4cb29f84cbd281946f48bb25, type: 3}
+  cost: 5
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
   isLocked: 1
   canBeUnlocked: 0
-  saveProgress: 0
   permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
   requiredSkills:
   - {fileID: 11400000, guid: ae4f218bf00c90a4db49bd1026e700b0, type: 2}
   exclusiveSkills: []
