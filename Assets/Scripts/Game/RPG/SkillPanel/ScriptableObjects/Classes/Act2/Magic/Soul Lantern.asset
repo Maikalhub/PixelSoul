@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a320509cd29634e4189ab44f5db30e48, type: 3}
+  m_Name: Soul Lantern
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillId: 
+  skillName: Soul Lantern
+  description: 
+  skillIcon: {fileID: 3928878328890046419, guid: fc49399afadc7de489ccbd4830956fa7, type: 3}
+  cost: 5
+  defaultIsLocked: 1
+  defaultCanBeUnlocked: 0
+  defaultPermanentlyLocked: 0
+  isLocked: 1
+  canBeUnlocked: 0
+  permanentlyLocked: 0
+  saveProgress: 0
+  resetToDefaultOnExit: 1
+  requiredSkills:
+  - {fileID: 11400000, guid: 18214e1922d9fcd46acc2c61ce1b7d81, type: 2}
+  exclusiveSkills:
+  - {fileID: 11400000, guid: e2a4e4bc6d5dfa046befe84a5ea4efb4, type: 2}
+  requireAll: 1
+  upgradeType: 1
+  statModifiers: []
+  specialEffects:
+  - effectType: 6
+    description: 
+    amount: 0
+    radius: 0
+    duration: 0
+    charges: 0
+    enabledOnUnlock: 1
